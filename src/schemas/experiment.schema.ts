@@ -96,28 +96,65 @@ export function validateTrialGraph(
       });
     }
 
-    if (trial.branching?.conditions) {
-      for (let j = 0; j < trial.branching.conditions.length; j++) {
-        const cond = trial.branching.conditions[j]!;
-        if (!trialIdSet.has(cond.targetTrialId)) {
+    if (trial.branching) {
+      if ('ifCorrect' in trial.branching || 'ifIncorrect' in trial.branching) {
+        const b = trial.branching as { ifCorrect?: string; ifIncorrect?: string };
+        if (!b.ifCorrect || !trialIdSet.has(b.ifCorrect)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message: `Branching condition targetTrialId '${cond.targetTrialId}' does not exist in this experiment`,
-            path: ['trials', i, 'branching', 'conditions', j, 'targetTrialId'],
+            message: `Branching ifCorrect target '${b.ifCorrect}' does not exist in this experiment`,
+            path: ['trials', i, 'branching', 'ifCorrect'],
+          });
+        } else if (b.ifCorrect === trial.id) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Self-referential branching detected: trial '${trial.id}' ifCorrect points to itself`,
+            path: ['trials', i, 'branching', 'ifCorrect'],
+          });
+        }
+
+        if (!b.ifIncorrect || !trialIdSet.has(b.ifIncorrect)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Branching ifIncorrect target '${b.ifIncorrect}' does not exist in this experiment`,
+            path: ['trials', i, 'branching', 'ifIncorrect'],
+          });
+        } else if (b.ifIncorrect === trial.id) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Self-referential branching detected: trial '${trial.id}' ifIncorrect points to itself`,
+            path: ['trials', i, 'branching', 'ifIncorrect'],
           });
         }
       }
-    }
 
-    if (
-      trial.branching?.defaultNextTrialId &&
-      !trialIdSet.has(trial.branching.defaultNextTrialId)
-    ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `Branching defaultNextTrialId '${trial.branching.defaultNextTrialId}' does not exist in this experiment`,
-        path: ['trials', i, 'branching', 'defaultNextTrialId'],
-      });
+      if ('conditions' in trial.branching && Array.isArray((trial.branching as any).conditions)) {
+        const legacy = trial.branching as {
+          conditions: Array<{ targetTrialId: string }>;
+          defaultNextTrialId?: string | null;
+        };
+        for (let j = 0; j < legacy.conditions.length; j++) {
+          const cond = legacy.conditions[j]!;
+          if (!trialIdSet.has(cond.targetTrialId)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `Branching condition targetTrialId '${cond.targetTrialId}' does not exist in this experiment`,
+              path: ['trials', i, 'branching', 'conditions', j, 'targetTrialId'],
+            });
+          }
+        }
+
+        if (
+          legacy.defaultNextTrialId &&
+          !trialIdSet.has(legacy.defaultNextTrialId)
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Branching defaultNextTrialId '${legacy.defaultNextTrialId}' does not exist in this experiment`,
+            path: ['trials', i, 'branching', 'defaultNextTrialId'],
+          });
+        }
+      }
     }
   }
 

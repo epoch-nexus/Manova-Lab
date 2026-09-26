@@ -61,10 +61,20 @@ export const branchingConditionSchema = z.object({
   targetTrialId: z.string().uuid(),
 });
 
-export const trialBranchingRuleSchema = z.object({
+export const correctnessBranchingSchema = z.object({
+  ifCorrect: z.string().uuid('ifCorrect must be a valid trial UUID'),
+  ifIncorrect: z.string().uuid('ifIncorrect must be a valid trial UUID'),
+});
+
+export const legacyBranchingSchema = z.object({
   conditions: z.array(branchingConditionSchema),
   defaultNextTrialId: z.string().uuid().nullable(),
-}).nullable().optional();
+});
+
+export const trialBranchingRuleSchema = z
+  .union([correctnessBranchingSchema, legacyBranchingSchema])
+  .nullable()
+  .optional();
 
 export const trialSchema = z.object({
   id: z.string().uuid('Trial id must be a valid UUID'),

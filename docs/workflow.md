@@ -14,7 +14,7 @@ This document serves as the master tracking file for the Manova Labs backend, co
 | **Phase 4** | **High-Precision Timing Engine** | `requestAnimationFrame`, sub-frame telemetry, jitter compensation | **COMPLETED** | Verified (42 tests passing, 50-trial verification, browser PoC) |
 | **Phase 5** | **Results Aggregation & Analytics** | Researcher results queries, CSV/JSON export, latency summaries | **COMPLETED** | Verified (51 tests passing, live smoke tests, JSON/CSV exports) |
 | **Phase 6** | **Randomization Engine** | Seeded Fisher-Yates, deterministic PRNG, session trial order persistence | **COMPLETED** | Verified (66 tests passing, migration, live smoke tests, seed reproducibility) |
-| **Phase 7** | **Conditional Branching Engine** | Dynamic routing rules, performance-dependent trial jumping | **PLANNED** | Pre-implementation plan required |
+| **Phase 7** | **Conditional Branching Engine** | Response-correctness branching, loop protection, snapshot isolation | **COMPLETED** | Verified (80 tests passing, live smoke tests, precedence compatibility) |
 | **Phase 8** | **Authentication & Production Hardening** | JWT/Auth, IRB compliance, rate limiting, deployment | **PLANNED** | Pre-implementation plan required |
 
 ---
@@ -231,13 +231,37 @@ To maintain complete architectural integrity, avoid uncoordinated dependencies, 
 
 ---
 
-## 9. Upcoming Phases Roadmap
+## 9. Phase 7 — Dynamic Conditional Branching Engine (COMPLETED)
 
-### Phase 7: Dynamic Conditional Branching Engine
-* **Goal**: Performance-contingent trial routing.
-* **Key Deliverables**:
-  1. Rule evaluation engine processing `trial.branching.conditions`.
-  2. Support for accuracy branches (e.g., repeating practice on error) and latency branches (e.g., speed-up warnings).
+### Objectives Achieved
+* **Response-Correctness Branching**: Implemented runtime conditional trial routing where a trial can specify `branching: { ifCorrect: string, ifIncorrect: string }`.
+* **Zero Database Migration**: Reused the existing `Trial.branching Json?` column established in Phase 2, maintaining 100% database schema stability.
+* **Precedence Architecture**:
+  1. Priority 1: If current trial has branching $\to$ branch target determines next trial.
+  2. Priority 2: If current trial has no branching and session is randomized $\to$ `session.trialOrder` determines next trial.
+  3. Priority 3: If current trial has no branching and session is linear $\to$ `currentTrial.nextTrialId` pointer determines next trial.
+* **Snapshot Isolation**: Branching rules resolve strictly against the session's locked `ExperimentVersion.snapshotData`, completely immune to subsequent researcher republishing.
+* **Multi-Layer Loop Protection**:
+  * Reject direct self-referential branching (`ifCorrect === trial.id || ifIncorrect === trial.id`) at publish validation.
+  * Cap runtime session execution at $\max(100, N_{\text{trials}} \times 10)$, returning a controlled 400 `EXECUTION_LIMIT_EXCEEDED` if a cycle is encountered.
+* **Participant Privacy**: Strip `branching` from participant-facing trial payloads (`branching: null`), preventing client-side inspection.
+
+### Deliverables & Key Files
+* **Engine & Domain Updates**:
+  * `src/engine/execution-engine.ts`: Added conditional branching resolution to `advanceLinearSequence` and `hasCorrectnessBranching` helper.
+  * `src/domain/session.service.ts`: Passed `isCorrect` and `randomizationEnabled` into `advanceLinearSequence`, added runtime loop protection bound.
+  * `src/schemas/trial.schema.ts` & `src/types/experiment.d.ts`: Added `CorrectnessBranchingRule` / `correctnessBranchingSchema`.
+  * `src/schemas/experiment.schema.ts`: Added graph validation verifying existence of `ifCorrect` and `ifIncorrect` targets and rejecting self-referential loops.
+* **Testing & Verification**:
+  * `tests/branching.test.ts`: 14 comprehensive unit & integration tests covering unit resolution, publish validation, live session branching, snapshot isolation, and randomization precedence.
+  * `scripts/smoke-test.ts`: Extended with live HTTP verification of conditional branching (18/18 passing).
+  * `docs/phase-7-checklist.md`: Complete technical checklist and verification audit.
+* **Git Status**:
+  * Implemented on branch `backend/branching`.
+
+---
+
+## 10. Upcoming Phases Roadmap
 
 ### Phase 8: Authentication & Production Hardening
 * **Goal**: Production-ready security, researcher accounts, and IRB/GDPR compliance.

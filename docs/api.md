@@ -71,6 +71,7 @@ Phase 2 backend services and validation middleware (e.g., Zod) must strictly enf
    - If `correctResponse` is provided, it must be contained in `allowedKeys`.
 10. **Publishing Pre-conditions**: An experiment cannot transition to `PUBLISHED` if any of the above validation rules fail.
 11. **Session Scope**: Participant responses are only accepted for the session's `currentTrialId`. Responses submitted out-of-order or for previously completed trials must be rejected with `INVALID_RESPONSE`.
+12. **Branching Validation (Phase 7)**: If a trial specifies `branching`, both `ifCorrect` and `ifIncorrect` must be valid UUIDs resolving to existing trials within the same experiment. Self-referential branching (`ifCorrect === trial.id` or `ifIncorrect === trial.id`) is rejected to prevent immediate 1-trial loops.
 
 ---
 
@@ -360,6 +361,9 @@ Initializes an anonymous session for a published experiment using its public slu
 > [!NOTE]
 > **Trial Order & Randomization (Phase 6)**:
 > If the published experiment has `config.randomization.enabled: true`, the backend computes a deterministic seeded Fisher-Yates permutation of all trial IDs at session creation time and stores the assigned sequence in `session.trialOrder`. `firstTrial` corresponds to `trialOrder[0]`. Subsequent calls to `GET /sessions/:sessionId/current-step` and responses to `POST /sessions/:sessionId/trials/:trialId/response` automatically follow this session-specific sequence without requiring any participant-side changes. The randomization seed is held internally on the session for scientific reproducibility.
+>
+> **Dynamic Conditional Branching (Phase 7)**:
+> When a trial defines `branching: { ifCorrect: string, ifIncorrect: string }`, the execution engine evaluates the participant's response correctness upon submission and immediately routes to the target trial. Branching takes priority over linear progression and session randomization. The `branching` field is always stripped (`branching: null`) in participant-facing payloads to protect study integrity.
 
 * **Error Responses**:
   * `404 Not Found`: `{ "error": { "code": "EXPERIMENT_NOT_FOUND", "message": "Study 'visual-rt-baseline' does not exist." } }`

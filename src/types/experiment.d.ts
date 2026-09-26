@@ -111,10 +111,17 @@ export interface BranchingCondition {
   targetTrialId: UUID;
 }
 
-export interface TrialBranchingRule {
+export interface CorrectnessBranchingRule {
+  ifCorrect: UUID;
+  ifIncorrect: UUID;
+}
+
+export interface LegacyBranchingRule {
   conditions: BranchingCondition[];
   defaultNextTrialId: UUID | null;
 }
+
+export type TrialBranchingRule = CorrectnessBranchingRule | LegacyBranchingRule;
 
 export interface Trial {
   id: UUID;
@@ -243,6 +250,7 @@ export type ApiErrorCode =
   | 'TRIAL_NOT_FOUND'
   | 'UNAUTHORIZED'
   | 'VALIDATION_ERROR'
+  | 'EXECUTION_LIMIT_EXCEEDED'
   | 'INTERNAL_SERVER_ERROR';
 
 export interface ApiErrorDetail {

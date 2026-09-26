@@ -161,6 +161,7 @@ export class SessionService {
         currentTrialIndex: session.currentTrialIndex,
         totalTrials: session.totalTrials,
         trialOrder: rawTrialOrder,
+        randomizationEnabled: session.randomizationEnabled,
       },
       snapshot
     );
@@ -233,6 +234,18 @@ export class SessionService {
         isCorrect = null;
       }
 
+      // Runtime loop protection safeguard: max execution bound per session
+      const responseCount = await tx.sessionResponse.count({
+        where: { sessionId: session.id },
+      });
+      const maxAllowedResponses = Math.max(100, snapshot.trials.length * 10);
+      if (responseCount >= maxAllowedResponses) {
+        throw new BadRequestError(
+          'Maximum trial execution limit exceeded for this session',
+          'EXECUTION_LIMIT_EXCEEDED'
+        );
+      }
+
       // 4. Record session response with timing telemetry (enforces unique constraint per session & trial)
       const responseId = `resp_${crypto.randomUUID()}`;
       await tx.sessionResponse.create({
@@ -251,7 +264,7 @@ export class SessionService {
 
       const rawTrialOrder = session.trialOrder as string[] | null;
 
-      // 5. Advance linear state machine
+      // 5. Advance state machine with conditional branching and randomization support
       const transition = this.engine.advanceLinearSequence(
         {
           id: session.id,
@@ -262,9 +275,11 @@ export class SessionService {
           currentTrialIndex: session.currentTrialIndex,
           totalTrials: session.totalTrials,
           trialOrder: rawTrialOrder,
+          randomizationEnabled: session.randomizationEnabled,
         },
         snapshot,
-        trialId
+        trialId,
+        isCorrect
       );
 
       // 6. Update session in database

@@ -425,7 +425,154 @@ async function runSmokeTests() {
       throw new Error('Trial repetition or missing trials detected');
     }
 
-    console.log('--- ALL 17 LIVE SMOKE TESTS PASSED CLEANLY! ---');
+    // 18. Phase 7: Dynamic Conditional Branching Engine Live Flow
+    console.log('[18/18] Testing Phase 7: Dynamic Conditional Branching Engine');
+    const branchTrial1 = '71111111-1111-4111-8111-111111111111';
+    const branchTrial2 = '72222222-2222-4222-8222-222222222222';
+    const branchTrial3 = '73333333-3333-4333-8333-333333333333';
+
+    // Verify invalid branch target is rejected at create time
+    const invalidBranchRes = await fetch(`${baseUrl}/api/v1/experiments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: 'Invalid Branch Study',
+        description: 'Should fail due to dangling target',
+        publicSlug: 'invalid-branch-study',
+        trials: [
+          {
+            id: branchTrial1,
+            orderIndex: 1,
+            stimulus: { id: '91111111-1111-4111-8111-111111111111', type: 'text', content: 'T1' },
+            timingConfig: { preStimulusDelayMs: 0, stimulusDurationMs: 500, responseTimeoutMs: 1000, allowEarlyResponse: false, waitForResponse: false },
+            expectedResponse: { type: 'keypress', allowedKeys: ['Space'], correctResponse: 'Space', evaluationMode: 'exact_match' },
+            nextTrialId: branchTrial2,
+            branching: { ifCorrect: '00000000-0000-4000-8000-000000000000', ifIncorrect: branchTrial2 },
+          },
+          {
+            id: branchTrial2,
+            orderIndex: 2,
+            stimulus: { id: '92222222-2222-4222-8222-222222222222', type: 'text', content: 'T2' },
+            timingConfig: { preStimulusDelayMs: 0, stimulusDurationMs: 500, responseTimeoutMs: 1000, allowEarlyResponse: false, waitForResponse: false },
+            expectedResponse: { type: 'keypress', allowedKeys: ['Space'], correctResponse: 'Space', evaluationMode: 'exact_match' },
+            nextTrialId: null,
+          },
+        ],
+      }),
+    });
+    if (invalidBranchRes.status !== 400) {
+      throw new Error(`Expected invalid branch to fail with 400, got ${invalidBranchRes.status}`);
+    }
+
+    // Create valid branching experiment
+    const validBranchRes = await fetch(`${baseUrl}/api/v1/experiments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: 'Phase 7 Branching Live Study',
+        description: 'Verifies runtime accuracy-contingent trial branching',
+        publicSlug: 'phase-7-branching-study',
+        trials: [
+          {
+            id: branchTrial1,
+            orderIndex: 1,
+            label: 'Decision Trial',
+            stimulus: { id: '81111111-1111-4111-8111-111111111111', type: 'text', content: 'Target Stimulus' },
+            timingConfig: { preStimulusDelayMs: 100, stimulusDurationMs: 500, responseTimeoutMs: 1000, allowEarlyResponse: false, waitForResponse: false },
+            expectedResponse: { type: 'keypress', allowedKeys: ['Space', 'KeyF'], correctResponse: 'Space', evaluationMode: 'exact_match' },
+            nextTrialId: branchTrial2,
+            branching: {
+              ifCorrect: branchTrial3,
+              ifIncorrect: branchTrial2,
+            },
+          },
+          {
+            id: branchTrial2,
+            orderIndex: 2,
+            label: 'Remediation Trial',
+            stimulus: { id: '82222222-2222-4222-8222-222222222222', type: 'text', content: 'Remediation' },
+            timingConfig: { preStimulusDelayMs: 100, stimulusDurationMs: 500, responseTimeoutMs: 1000, allowEarlyResponse: false, waitForResponse: false },
+            expectedResponse: { type: 'keypress', allowedKeys: ['Space'], correctResponse: 'Space', evaluationMode: 'exact_match' },
+            nextTrialId: branchTrial3,
+            branching: null,
+          },
+          {
+            id: branchTrial3,
+            orderIndex: 3,
+            label: 'Terminal Trial',
+            stimulus: { id: '83333333-3333-4333-8333-333333333333', type: 'text', content: 'Terminal' },
+            timingConfig: { preStimulusDelayMs: 100, stimulusDurationMs: 500, responseTimeoutMs: 1000, allowEarlyResponse: false, waitForResponse: false },
+            expectedResponse: { type: 'keypress', allowedKeys: ['Space'], correctResponse: 'Space', evaluationMode: 'exact_match' },
+            nextTrialId: null,
+            branching: null,
+          },
+        ],
+      }),
+    });
+    const validBranchData = await validBranchRes.json();
+    if (validBranchRes.status !== 201) throw new Error('Valid branching experiment creation failed');
+
+    // Publish
+    const pubBranchRes = await fetch(`${baseUrl}/api/v1/experiments/${validBranchData.id}/publish`, { method: 'POST' });
+    if (pubBranchRes.status !== 200) throw new Error('Branching experiment publish failed');
+
+    // Session A: Submit CORRECT response -> branches directly to Trial 3 (skipping Trial 2)
+    const sessionARes = await fetch(`${baseUrl}/api/v1/participant/experiments/phase-7-branching-study/sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const sessionAData = await sessionARes.json();
+
+    const respA = await fetch(`${baseUrl}/api/v1/participant/sessions/${sessionAData.sessionId}/trials/${branchTrial1}/response`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ submittedResponse: 'Space', reactionTimeMs: 280 }),
+    });
+    const respAData = await respA.json();
+    if (respAData.nextTrial.id !== branchTrial3) {
+      throw new Error(`Session A did not branch to ifCorrect target: expected ${branchTrial3}, got ${respAData.nextTrial.id}`);
+    }
+
+    // Complete Session A on Trial 3
+    const completeA = await fetch(`${baseUrl}/api/v1/participant/sessions/${sessionAData.sessionId}/trials/${branchTrial3}/response`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ submittedResponse: 'Space', reactionTimeMs: 290 }),
+    });
+    const completeAData = await completeA.json();
+    if (!completeAData.isCompleted) throw new Error('Session A did not complete on terminal trial');
+
+    // Session B: Submit INCORRECT response -> branches to Trial 2
+    const sessionBRes = await fetch(`${baseUrl}/api/v1/participant/experiments/phase-7-branching-study/sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const sessionBData = await sessionBRes.json();
+
+    const respB = await fetch(`${baseUrl}/api/v1/participant/sessions/${sessionBData.sessionId}/trials/${branchTrial1}/response`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ submittedResponse: 'KeyF', reactionTimeMs: 380 }),
+    });
+    const respBData = await respB.json();
+    if (respBData.nextTrial.id !== branchTrial2) {
+      throw new Error(`Session B did not branch to ifIncorrect target: expected ${branchTrial2}, got ${respBData.nextTrial.id}`);
+    }
+
+    // Trial 2 (non-branching) continues normally to Trial 3
+    const continueB = await fetch(`${baseUrl}/api/v1/participant/sessions/${sessionBData.sessionId}/trials/${branchTrial2}/response`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ submittedResponse: 'Space', reactionTimeMs: 320 }),
+    });
+    const continueBData = await continueB.json();
+    if (continueBData.nextTrial.id !== branchTrial3) {
+      throw new Error(`Session B did not advance to Trial 3: expected ${branchTrial3}, got ${continueBData.nextTrial.id}`);
+    }
+
+    console.log('--- ALL 18 LIVE SMOKE TESTS PASSED CLEANLY! ---');
   } finally {
     await prisma.sessionResponse.deleteMany();
     await prisma.session.deleteMany();

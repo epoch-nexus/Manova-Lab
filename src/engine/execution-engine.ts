@@ -21,6 +21,15 @@ export interface SessionContext {
   currentTrialIndex: number;
   totalTrials: number;
   trialOrder?: string[] | null;
+  randomizationEnabled?: boolean;
+}
+
+function hasCorrectnessBranching(
+  branching: unknown
+): branching is { ifCorrect: string; ifIncorrect: string } {
+  if (!branching || typeof branching !== 'object') return false;
+  const b = branching as Record<string, unknown>;
+  return typeof b.ifCorrect === 'string' && typeof b.ifIncorrect === 'string';
 }
 
 export class ExecutionEngine {
@@ -57,13 +66,10 @@ export class ExecutionEngine {
     }
 
     const projectedNextTrialId =
-      session.trialOrder && session.trialOrder.length > 0
+      session.randomizationEnabled && session.trialOrder && session.trialOrder.length > 0
         ? (session.trialOrder[session.currentTrialIndex + 1] ?? null)
         : trial.nextTrialId;
-    const projectedOrderIndex =
-      session.trialOrder && session.trialOrder.length > 0
-        ? session.currentTrialIndex + 1
-        : trial.orderIndex;
+    const projectedOrderIndex = session.currentTrialIndex + 1;
 
     return {
       sessionId: session.id,
@@ -108,13 +114,18 @@ export class ExecutionEngine {
   }
 
   /**
-   * Advances the session along the linear trial sequence.
-   * Does NOT evaluate conditional branching; follows session.trialOrder or nextTrialId pointer deterministically.
+   * Advances the session sequence based on branching (Phase 7), trialOrder (Phase 6), or linear pointer (Phase 3).
+   * Precedence:
+   * 1. If current trial has branching -> branching determines next trial based on response correctness.
+   * 2. Otherwise:
+   *    - If randomized session -> follows session.trialOrder
+   *    - If linear session -> follows currentTrial.nextTrialId pointer
    */
   advanceLinearSequence(
     session: SessionContext,
     snapshot: Experiment,
-    submittedTrialId: string
+    submittedTrialId: string,
+    isCorrect?: boolean | null
   ): TransitionResult {
     if (session.status !== 'IN_PROGRESS') {
       throw new BadRequestError('Session is not in progress', 'SESSION_ALREADY_COMPLETED');
@@ -135,8 +146,45 @@ export class ExecutionEngine {
       );
     }
 
-    // If trialOrder is stored on session, follow it
-    if (session.trialOrder && session.trialOrder.length > 0) {
+    // 1. Dynamic Conditional Branching (Phase 7): If current trial has branching, it takes precedence
+    if (hasCorrectnessBranching(currentTrial.branching)) {
+      const targetTrialId =
+        isCorrect === true
+          ? currentTrial.branching.ifCorrect
+          : currentTrial.branching.ifIncorrect;
+
+      const nextTrial = snapshot.trials.find((t) => t.id === targetTrialId);
+      if (!nextTrial) {
+        throw new BadRequestError(
+          `Corrupted branching pointer: target trial '${targetTrialId}' missing from snapshot`,
+          'TRIAL_NOT_FOUND'
+        );
+      }
+
+      let nextTrialIndex = session.currentTrialIndex + 1;
+      let projectedNextTrialId: string | null = nextTrial.nextTrialId;
+
+      if (session.randomizationEnabled && session.trialOrder && session.trialOrder.length > 0) {
+        const targetPos = session.trialOrder.indexOf(targetTrialId);
+        if (targetPos >= 0) {
+          nextTrialIndex = targetPos;
+          projectedNextTrialId = session.trialOrder[targetPos + 1] ?? null;
+        }
+      }
+
+      return {
+        sessionStatus: 'IN_PROGRESS',
+        executionState: 'AWAITING_RESPONSE',
+        nextTrialId: nextTrial.id,
+        nextTrialIndex,
+        nextTrial: this.stripTrial(nextTrial, projectedNextTrialId, nextTrialIndex + 1),
+        isCompleted: false,
+        completionMessage: null,
+      };
+    }
+
+    // 2. Non-branching: If randomized session, follow session.trialOrder
+    if (session.randomizationEnabled && session.trialOrder && session.trialOrder.length > 0) {
       const nextTrialIndex = session.currentTrialIndex + 1;
 
       // Terminal trial reached
@@ -175,7 +223,7 @@ export class ExecutionEngine {
       };
     }
 
-    // Fallback: Legacy progression using currentTrial.nextTrialId
+    // 3. Non-branching & Non-randomized: Follow currentTrial.nextTrialId
     if (currentTrial.nextTrialId === null) {
       return {
         sessionStatus: 'COMPLETED',
