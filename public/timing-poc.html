@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manova Labs — High-Precision Browser Timing PoC</title>
+  <style>
+    :root {
+      --bg-primary: #0f172a;
+      --bg-card: #1e293b;
+      --bg-panel: #090d16;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.25);
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --border: #334155;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px;
+    }
+
+    header {
+      width: 100%;
+      max-width: 1000px;
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text-main);
+      letter-spacing: -0.02em;
+    }
+
+    .brand span {
+      background: var(--accent);
+      color: #0f172a;
+      font-size: 0.75rem;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .badge-refresh {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      color: var(--accent);
+      font-family: monospace;
+    }
+
+    main {
+      width: 100%;
+      max-width: 1000px;
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 24px;
+    }
+
+    /* Left Column: Visual Presentation Canvas & Real-time HUD */
+    .viewport-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .canvas-container {
+      height: 380px;
+      background: var(--bg-panel);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      user-select: none;
+    }
+
+    #fixation-cross {
+      font-size: 54px;
+      font-weight: 300;
+      color: #94a3b8;
+      display: none;
+    }
+
+    #stimulus-target {
+      font-size: 72px;
+      font-weight: 800;
+      color: #38bdf8;
+      display: none;
+      text-shadow: 0 0 20px var(--accent-glow);
+    }
+
+    #canvas-message {
+      font-size: 1rem;
+      color: var(--text-muted);
+      text-align: center;
+      max-width: 80%;
+      line-height: 1.5;
+    }
+
+    .hud-bar {
+      padding: 16px;
+      background: var(--bg-card);
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .hud-metric {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .hud-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+    }
+
+    .hud-value {
+      font-size: 1.15rem;
+      font-weight: 700;
+      font-family: 'SF Mono', Consolas, Monaco, monospace;
+      color: var(--text-main);
+    }
+
+    .hud-value.highlight {
+      color: var(--accent);
+    }
+
+    .state-pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      background: #334155;
+      color: #f8fafc;
+      text-align: center;
+    }
+    .state-IDLE { background: #334155; }
+    .state-PRE_STIMULUS { background: #d97706; color: #fff; }
+    .state-STIMULUS_PENDING_PRESENTATION { background: #0284c7; color: #fff; }
+    .state-STIMULUS_PRESENTED { background: #2563eb; color: #fff; }
+    .state-AWAITING_RESPONSE { background: #16a34a; color: #fff; }
+    .state-RESPONSE_CAPTURED { background: #9333ea; color: #fff; }
+    .state-TIMEOUT { background: #dc2626; color: #fff; }
+    .state-COMPLETE { background: #475569; color: #fff; }
+
+    /* Right Column: Controls & Configuration */
+    .controls-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .controls-card h2 {
+      font-size: 1.1rem;
+      color: var(--text-main);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-group label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .form-group input, .form-group select {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      border-radius: 6px;
+      color: var(--text-main);
+      font-size: 0.9rem;
+    }
+
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    button {
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s ease;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #0f172a;
+    }
+    .btn-primary:hover:not(:disabled) {
+      background: #7dd3fc;
+      box-shadow: 0 0 15px var(--accent-glow);
+    }
+
+    .btn-secondary {
+      background: #334155;
+      color: var(--text-main);
+    }
+    .btn-secondary:hover:not(:disabled) {
+      background: #475569;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Diagnostics Section */
+    .diagnostics-section {
+      grid-column: 1 / -1;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .diagnostics-section h2 {
+      font-size: 1.1rem;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .summary-box {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .summary-box .title {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .summary-box .num {
+      font-size: 1.25rem;
+      font-weight: 700;
+      font-family: monospace;
+      color: var(--text-main);
+    }
+
+    .table-container {
+      max-height: 280px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      font-family: monospace;
+    }
+
+    th {
+      background: var(--bg-panel);
+      padding: 10px 12px;
+      text-align: left;
+      color: var(--text-muted);
+      position: sticky;
+      top: 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 8px 12px;
+      border-bottom: 1px solid #1e293b;
+    }
+
+    tr:nth-child(even) {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .tag-timeout { color: var(--danger); font-weight: 700; }
+    .tag-success { color: var(--success); }
+    .tag-tab { color: var(--warning); font-size: 0.75rem; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <h1>MANOVA LABS</h1>
+      <span>Phase 4</span>
+      <p style="color: var(--text-muted); font-size: 0.9rem;">Browser High-Precision Timing Engine PoC</p>
+    </div>
+    <div class="badge-refresh" id="refresh-badge">FPS: Measuring...</div>
+  </header>
+
+  <main>
+    <!-- Visual Presentation Canvas & Real-time HUD -->
+    <div class="viewport-card">
+      <div class="canvas-container" id="canvas-area">
+        <div id="fixation-cross">+</div>
+        <div id="stimulus-target">X</div>
+        <div id="canvas-message">Press "Start 50+ Trial Verification" to begin the high-precision browser timing test.</div>
+      </div>
+
+      <div class="hud-bar">
+        <div class="hud-metric">
+          <div class="hud-label">Trial Progression</div>
+          <div class="hud-value" id="hud-trial">0 / 0</div>
+        </div>
+        <div class="hud-metric">
+          <div class="hud-label">Timing State</div>
+          <div><span class="state-pill state-IDLE" id="hud-state">IDLE</span></div>
+        </div>
+        <div class="hud-metric">
+          <div class="hud-label">Stimulus Onset (ms)</div>
+          <div class="hud-value" id="hud-stim-ts">0.000</div>
+        </div>
+        <div class="hud-metric">
+          <div class="hud-label">Reaction Time</div>
+          <div class="hud-value highlight" id="hud-rt">0.000 ms</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Controls Panel -->
+    <div class="controls-card">
+      <h2>Test Controls</h2>
+
+      <div class="form-group">
+        <label for="input-mode">Execution Mode</label>
+        <select id="input-mode">
+          <option value="auto">Automated Simulation (50+ Trials with Simulated RT)</option>
+          <option value="manual">Manual Subject Mode (Press SPACEBAR)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="input-trials">Trial Count (Min: 50)</label>
+        <input type="number" id="input-trials" value="50" min="1" max="200">
+      </div>
+
+      <div class="form-group">
+        <label for="input-pre-delay">Pre-Stimulus Fixation (ms)</label>
+        <input type="number" id="input-pre-delay" value="150" min="50" step="50">
+      </div>
+
+      <div class="form-group">
+        <label for="input-stim-duration">Stimulus Duration (ms)</label>
+        <input type="number" id="input-stim-duration" value="600" min="100" step="100">
+      </div>
+
+      <div class="form-group">
+        <label for="input-timeout">Response Timeout (ms)</label>
+        <input type="number" id="input-timeout" value="800" min="200" step="100">
+      </div>
+
+      <div class="btn-group">
+        <button class="btn-primary" id="btn-start">Start 50+ Trial Verification</button>
+        <button class="btn-secondary" id="btn-abort" disabled>Abort Test</button>
+      </div>
+    </div>
+
+    <!-- Diagnostic Observations & Audit Table -->
+    <section class="diagnostics-section">
+      <h2>
+        <span>Timing Diagnostics & Verification Telemetry</span>
+        <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal;">performance.now() + requestAnimationFrame</span>
+      </h2>
+
+      <div class="summary-grid">
+        <div class="summary-box">
+          <div class="title">Completed</div>
+          <div class="num" id="stat-completed">0</div>
+        </div>
+        <div class="summary-box">
+          <div class="title">Responses</div>
+          <div class="num" id="stat-responses" style="color: var(--success);">0</div>
+        </div>
+        <div class="summary-box">
+          <div class="title">Timeouts</div>
+          <div class="num" id="stat-timeouts" style="color: var(--danger);">0</div>
+        </div>
+        <div class="summary-box">
+          <div class="title">Min RT</div>
+          <div class="num" id="stat-min-rt">—</div>
+        </div>
+        <div class="summary-box">
+          <div class="title">Mean RT</div>
+          <div class="num" id="stat-mean-rt" style="color: var(--accent);">—</div>
+        </div>
+        <div class="summary-box">
+          <div class="title">Max RT</div>
+          <div class="num" id="stat-max-rt">—</div>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Stimulus Onset (ms)</th>
+              <th>Response TS (ms)</th>
+              <th>Reaction Time (ms)</th>
+              <th>Status</th>
+              <th>Telemetry Flags</th>
+            </tr>
+          </thead>
+          <tbody id="trial-log-body">
+            <tr>
+              <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">
+                No trials executed yet. Click "Start 50+ Trial Verification" to run the timing engine.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // =========================================================================
+    // Manova Labs — Browser High-Precision Timing Engine Client Implementation
+    // =========================================================================
+
+    class BrowserTimingController {
+      constructor() {
+        this.state = 'IDLE';
+        this.tokenCounter = 0;
+        this.activeTrialToken = 0;
+        this.preStimulusTimer = null;
+        this.stimulusDurationTimer = null;
+        this.timeoutTimer = null;
+        this.rafHandle = null;
+        this.keydownListener = null;
+        this.visibilityListener = null;
+        this.hiddenTabDetected = false;
+        this.estimatedRefreshRate = null;
+      }
+
+      getState() {
+        return this.state;
+      }
+
+      async estimateRefreshRate(samples = 20) {
+        return new Promise((resolve) => {
+          const timestamps = [];
+          let count = 0;
+          const onFrame = (ts) => {
+            timestamps.push(ts);
+            count++;
+            if (count < samples) {
+              requestAnimationFrame(onFrame);
+            } else {
+              const deltas = [];
+              for (let i = 1; i < timestamps.length; i++) {
+                deltas.push(timestamps[i] - timestamps[i - 1]);
+              }
+              const avgDelta = deltas.reduce((a, b) => a + b, 0) / deltas.length;
+              const hz = avgDelta > 0 ? Math.round(1000 / avgDelta) : 60;
+              this.estimatedRefreshRate = hz;
+              resolve(hz);
+            }
+          };
+          requestAnimationFrame(onFrame);
+        });
+      }
+
+      abortTrial() {
+        this.cleanupActiveTrial();
+        this.transitionState('IDLE');
+      }
+
+      async runTrial(trial, callbacks) {
+        this.cleanupActiveTrial();
+        const currentToken = ++this.tokenCounter;
+        this.activeTrialToken = currentToken;
+
+        this.hiddenTabDetected = document.visibilityState === 'hidden';
+
+        this.visibilityListener = () => {
+          if (document.visibilityState === 'hidden') {
+            this.hiddenTabDetected = true;
+          }
+        };
+        document.addEventListener('visibilitychange', this.visibilityListener);
+
+        return new Promise((resolve) => {
+          const timingConfig = trial.timingConfig;
+          const expectedResponse = trial.expectedResponse;
+          const preStimulusStart = performance.now();
+
+          let stimulusPresentationTimestamp = 0;
+          let actualPreStimulusDurationMs = 0;
+          let trialFinished = false;
+
+          const finishTrial = (result) => {
+            if (trialFinished || this.activeTrialToken !== currentToken) return;
+            trialFinished = true;
+            this.cleanupActiveTrial();
+            resolve(result);
+          };
+
+          // Setup Key Listener
+          this.setupInputListener((code) => {
+            if (this.state === 'PRE_STIMULUS') {
+              if (timingConfig.allowEarlyResponse) {
+                const responseTimestamp = performance.now();
+                const latency = responseTimestamp - preStimulusStart;
+                this.transitionState('RESPONSE_CAPTURED', callbacks);
+                callbacks?.onResponseCaptured?.(code, latency);
+                this.transitionState('COMPLETE', callbacks);
+
+                finishTrial({
+                  trialId: trial.id,
+                  submittedResponse: code,
+                  reactionTimeMs: latency,
+                  timedOut: false,
+                  stimulusPresentationTimestamp: preStimulusStart,
+                  responseTimestamp,
+                  timingMeasurement: {
+                    stimulusOnsetTimestamp: preStimulusStart,
+                    responseTimestamp,
+                    calculatedLatencyMs: latency,
+                    hardwarePrecision: {
+                      timingMethod: 'performanceNow',
+                      displayRefreshRateEstimateHz: this.estimatedRefreshRate,
+                      hiddenTabDetected: this.hiddenTabDetected,
+                      preStimulusActualDurationMs: 0
+                    }
+                  }
+                });
+              }
+              return;
+            }
+
+            if (this.state === 'AWAITING_RESPONSE') {
+              if (expectedResponse?.allowedKeys && !expectedResponse.allowedKeys.includes(code)) {
+                return;
+              }
+
+              const responseTimestamp = performance.now();
+              const reactionTimeMs = responseTimestamp - stimulusPresentationTimestamp;
+
+              // Immediately unhook input listener to block duplicate keypresses
+              this.removeInputListener();
+
+              this.transitionState('RESPONSE_CAPTURED', callbacks);
+              callbacks?.onResponseCaptured?.(code, reactionTimeMs);
+              this.transitionState('COMPLETE', callbacks);
+
+              finishTrial({
+                trialId: trial.id,
+                submittedResponse: code,
+                reactionTimeMs,
+                timedOut: false,
+                stimulusPresentationTimestamp,
+                responseTimestamp,
+                timingMeasurement: {
+                  stimulusOnsetTimestamp: stimulusPresentationTimestamp,
+                  responseTimestamp,
+                  calculatedLatencyMs: reactionTimeMs,
+                  hardwarePrecision: {
+                    timingMethod: 'requestAnimationFrame',
+                    displayRefreshRateEstimateHz: this.estimatedRefreshRate,
+                    hiddenTabDetected: this.hiddenTabDetected,
+                    preStimulusActualDurationMs: actualPreStimulusDurationMs
+                  }
+                }
+              });
+            }
+          });
+
+          // 1. Enter PRE_STIMULUS
+          this.transitionState('PRE_STIMULUS', callbacks);
+          callbacks?.onFixationShow?.(trial.fixation);
+
+          const preDelay = Math.max(0, timingConfig.preStimulusDelayMs);
+
+          this.preStimulusTimer = setTimeout(() => {
+            if (this.activeTrialToken !== currentToken || trialFinished) return;
+
+            // 2. Pre-stimulus complete: transition to STIMULUS_PENDING_PRESENTATION
+            this.transitionState('STIMULUS_PENDING_PRESENTATION', callbacks);
+            callbacks?.onFixationHide?.();
+
+            // 3. Coordinate display refresh with requestAnimationFrame
+            this.rafHandle = requestAnimationFrame((_ts) => {
+              if (this.activeTrialToken !== currentToken || trialFinished) return;
+
+              stimulusPresentationTimestamp = performance.now();
+              actualPreStimulusDurationMs = stimulusPresentationTimestamp - preStimulusStart;
+
+              // Stimulus presented on physical frame
+              this.transitionState('STIMULUS_PRESENTED', callbacks);
+              callbacks?.onStimulusShow?.(trial.stimulus, stimulusPresentationTimestamp);
+
+              // Immediately transition to AWAITING_RESPONSE
+              this.transitionState('AWAITING_RESPONSE', callbacks);
+
+              if (timingConfig.stimulusDurationMs > 0) {
+                this.stimulusDurationTimer = setTimeout(() => {
+                  if (this.activeTrialToken !== currentToken || trialFinished) return;
+                  callbacks?.onStimulusHide?.();
+                }, timingConfig.stimulusDurationMs);
+              }
+
+              if (!timingConfig.waitForResponse && timingConfig.responseTimeoutMs > 0) {
+                this.timeoutTimer = setTimeout(() => {
+                  if (this.activeTrialToken !== currentToken || trialFinished) return;
+
+                  this.removeInputListener();
+                  this.transitionState('TIMEOUT', callbacks);
+                  callbacks?.onTimeout?.();
+                  this.transitionState('COMPLETE', callbacks);
+
+                  finishTrial({
+                    trialId: trial.id,
+                    submittedResponse: null,
+                    reactionTimeMs: null,
+                    timedOut: true,
+                    stimulusPresentationTimestamp,
+                    responseTimestamp: null,
+                    timingMeasurement: null
+                  });
+                }, timingConfig.responseTimeoutMs);
+              }
+            });
+          }, preDelay);
+        });
+      }
+
+      dispatchInput(code) {
+        if (this.keydownListener) {
+          this.keydownListener({ code, key: code });
+        }
+      }
+
+      transitionState(newState, callbacks) {
+        this.state = newState;
+        callbacks?.onStateChange?.(newState);
+      }
+
+      setupInputListener(onInput) {
+        this.removeInputListener();
+        this.keydownListener = (e) => {
+          const code = e.code || e.key;
+          onInput(code);
+        };
+        window.addEventListener('keydown', this.keydownListener);
+      }
+
+      removeInputListener() {
+        if (this.keydownListener) {
+          window.removeEventListener('keydown', this.keydownListener);
+          this.keydownListener = null;
+        }
+      }
+
+      cleanupActiveTrial() {
+        if (this.preStimulusTimer !== null) {
+          clearTimeout(this.preStimulusTimer);
+          this.preStimulusTimer = null;
+        }
+        if (this.stimulusDurationTimer !== null) {
+          clearTimeout(this.stimulusDurationTimer);
+          this.stimulusDurationTimer = null;
+        }
+        if (this.timeoutTimer !== null) {
+          clearTimeout(this.timeoutTimer);
+          this.timeoutTimer = null;
+        }
+        if (this.rafHandle !== null) {
+          cancelAnimationFrame(this.rafHandle);
+          this.rafHandle = null;
+        }
+        this.removeInputListener();
+        if (this.visibilityListener) {
+          document.removeEventListener('visibilitychange', this.visibilityListener);
+          this.visibilityListener = null;
+        }
+      }
+    }
+
+    // =========================================================================
+    // UI Orchestration & Diagnostic Reporting
+    // =========================================================================
+
+    const controller = new BrowserTimingController();
+    const results = [];
+    let isRunning = false;
+    let abortRequested = false;
+
+    // DOM Elements
+    const fixationEl = document.getElementById('fixation-cross');
+    const stimulusEl = document.getElementById('stimulus-target');
+    const messageEl = document.getElementById('canvas-message');
+    const hudTrialEl = document.getElementById('hud-trial');
+    const hudStateEl = document.getElementById('hud-state');
+    const hudStimTsEl = document.getElementById('hud-stim-ts');
+    const hudRtEl = document.getElementById('hud-rt');
+    const refreshBadgeEl = document.getElementById('refresh-badge');
+
+    const btnStart = document.getElementById('btn-start');
+    const btnAbort = document.getElementById('btn-abort');
+    const modeSelect = document.getElementById('input-mode');
+    const trialsInput = document.getElementById('input-trials');
+    const preDelayInput = document.getElementById('input-pre-delay');
+    const stimDurationInput = document.getElementById('input-stim-duration');
+    const timeoutInput = document.getElementById('input-timeout');
+
+    const statCompleted = document.getElementById('stat-completed');
+    const statResponses = document.getElementById('stat-responses');
+    const statTimeouts = document.getElementById('stat-timeouts');
+    const statMinRt = document.getElementById('stat-min-rt');
+    const statMeanRt = document.getElementById('stat-mean-rt');
+    const statMaxRt = document.getElementById('stat-max-rt');
+    const tableBody = document.getElementById('trial-log-body');
+
+    // Initialize Refresh Rate
+    controller.estimateRefreshRate(30).then((hz) => {
+      refreshBadgeEl.textContent = `Display: ~${hz} Hz vsync`;
+    });
+
+    function updateStateBadge(state) {
+      hudStateEl.textContent = state;
+      hudStateEl.className = `state-pill state-${state}`;
+    }
+
+    function updateSummaryStats() {
+      statCompleted.textContent = results.length;
+      let respCount = 0;
+      let timeoutCount = 0;
+      const rts = [];
+
+      results.forEach((r) => {
+        if (r.timedOut) {
+          timeoutCount++;
+        } else if (r.reactionTimeMs !== null) {
+          respCount++;
+          rts.push(r.reactionTimeMs);
+        }
+      });
+
+      statResponses.textContent = respCount;
+      statTimeouts.textContent = timeoutCount;
+
+      if (rts.length > 0) {
+        const min = Math.min(...rts);
+        const max = Math.max(...rts);
+        const mean = rts.reduce((a, b) => a + b, 0) / rts.length;
+        statMinRt.textContent = min.toFixed(1) + ' ms';
+        statMaxRt.textContent = max.toFixed(1) + ' ms';
+        statMeanRt.textContent = mean.toFixed(1) + ' ms';
+      }
+    }
+
+    function appendTableRow(index, result) {
+      if (results.length === 1) {
+        tableBody.innerHTML = '';
+      }
+      const row = document.createElement('tr');
+      const stimTs = result.stimulusPresentationTimestamp.toFixed(2);
+      const respTs = result.responseTimestamp ? result.responseTimestamp.toFixed(2) : '—';
+      const rt = result.reactionTimeMs !== null ? result.reactionTimeMs.toFixed(2) + ' ms' : '—';
+      const statusBadge = result.timedOut
+        ? '<span class="tag-timeout">TIMEOUT</span>'
+        : '<span class="tag-success">RECORDED (' + result.submittedResponse + ')</span>';
+
+      let telemetry = 'rAF vsync';
+      if (result.timingMeasurement?.hardwarePrecision?.hiddenTabDetected) {
+        telemetry += ' | <span class="tag-tab">HIDDEN TAB</span>';
+      }
+
+      row.innerHTML = `
+        <td>${index}</td>
+        <td>${stimTs}</td>
+        <td>${respTs}</td>
+        <td>${rt}</td>
+        <td>${statusBadge}</td>
+        <td>${telemetry}</td>
+      `;
+      tableBody.appendChild(row);
+      // Auto-scroll table to bottom
+      row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    async function runTestSeries() {
+      const totalTrials = parseInt(trialsInput.value, 10) || 50;
+      const mode = modeSelect.value;
+      const preDelay = parseInt(preDelayInput.value, 10) || 400;
+      const stimDuration = parseInt(stimDurationInput.value, 10) || 1200;
+      const timeout = parseInt(timeoutInput.value, 10) || 2000;
+
+      results.length = 0;
+      tableBody.innerHTML = '';
+      updateSummaryStats();
+
+      isRunning = true;
+      abortRequested = false;
+      btnStart.disabled = true;
+      btnAbort.disabled = false;
+      messageEl.style.display = 'none';
+
+      for (let i = 1; i <= totalTrials; i++) {
+        if (abortRequested) break;
+
+        hudTrialEl.textContent = `${i} / ${totalTrials}`;
+        const targetStim = i % 2 === 0 ? 'O' : 'X';
+        stimulusEl.textContent = targetStim;
+
+        const trialDefinition = {
+          id: `trial_${i}`,
+          orderIndex: i,
+          stimulus: { id: `stim_${i}`, type: 'text', content: targetStim },
+          timingConfig: {
+            preStimulusDelayMs: preDelay,
+            stimulusDurationMs: stimDuration,
+            responseTimeoutMs: timeout,
+            allowEarlyResponse: false,
+            waitForResponse: false
+          },
+          expectedResponse: {
+            type: 'keypress',
+            allowedKeys: ['Space'],
+            evaluationMode: 'exact_match'
+          }
+        };
+
+        const callbacks = {
+          onStateChange: (state) => updateStateBadge(state),
+          onFixationShow: () => {
+            messageEl.style.display = 'none';
+            stimulusEl.style.display = 'none';
+            fixationEl.style.display = 'block';
+          },
+          onFixationHide: () => {
+            fixationEl.style.display = 'none';
+          },
+          onStimulusShow: (_stim, onsetTs) => {
+            stimulusEl.style.display = 'block';
+            hudStimTsEl.textContent = onsetTs.toFixed(2);
+          },
+          onStimulusHide: () => {
+            stimulusEl.style.display = 'none';
+          },
+          onResponseCaptured: (_resp, rt) => {
+            hudRtEl.textContent = rt.toFixed(2) + ' ms';
+          },
+          onTimeout: () => {
+            hudRtEl.textContent = 'TIMEOUT';
+          }
+        };
+
+        const trialPromise = controller.runTrial(trialDefinition, callbacks);
+
+        // Simulated Subject Mode handling
+        if (mode === 'auto') {
+          // Occasionally simulate a timeout (e.g., trial 10 and 35) to verify timeout behavior
+          const isTimeoutTrial = (i === 10 || i === 35);
+          if (!isTimeoutTrial) {
+            // Realistic human RT: 210ms to 380ms with slight variability
+            const simulatedRt = 210 + Math.random() * 140;
+            setTimeout(() => {
+              if (controller.getState() === 'AWAITING_RESPONSE') {
+                controller.dispatchInput('Space');
+              }
+            }, preDelay + 16 + simulatedRt);
+          }
+        }
+
+        const result = await trialPromise;
+        results.push(result);
+        updateSummaryStats();
+        appendTableRow(i, result);
+
+        // Inter-trial interval (150ms buffer)
+        updateStateBadge('IDLE');
+        stimulusEl.style.display = 'none';
+        fixationEl.style.display = 'none';
+        await new Promise((r) => setTimeout(r, 150));
+      }
+
+      isRunning = false;
+      btnStart.disabled = false;
+      btnAbort.disabled = true;
+      updateStateBadge('COMPLETE');
+      messageEl.textContent = `Completed ${results.length} trials. Verification diagnostics summarized above.`;
+      messageEl.style.display = 'block';
+    }
+
+    btnStart.addEventListener('click', () => {
+      if (!isRunning) {
+        runTestSeries();
+      }
+    });
+
+    btnAbort.addEventListener('click', () => {
+      if (isRunning) {
+        abortRequested = true;
+        controller.abortTrial();
+        isRunning = false;
+        btnStart.disabled = false;
+        btnAbort.disabled = true;
+        updateStateBadge('IDLE');
+        messageEl.textContent = 'Test aborted by user.';
+        messageEl.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>

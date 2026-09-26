@@ -25,6 +25,12 @@ export function createApp(): Application {
     res.status(200).json({ status: 'ok', service: 'manova-labs-backend' });
   });
 
+  // Serve static assets (including Phase 4 Timing PoC)
+  app.use(express.static('public'));
+  app.get('/timing-poc', (_req: Request, res: Response) => {
+    res.sendFile('timing-poc.html', { root: 'public' });
+  });
+
   // Mount Researcher Experiments Router (both versioned and direct root paths)
   app.use('/api/v1/experiments', experimentRouter);
   app.use('/experiments', experimentRouter);

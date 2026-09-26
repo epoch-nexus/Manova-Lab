@@ -11,7 +11,7 @@ This document serves as the master tracking file for the Manova Labs backend, co
 | **Phase 1** | **Experiment Schema & API Contract** | Data contracts, schemas, TypeScript types, examples, architecture | **COMPLETED** | Verified & committed to `origin/main` |
 | **Phase 2** | **Runtime Validation & Database Persistence** | Zod schemas, PostgreSQL + Prisma, REST API server implementation | **COMPLETED** | Verified (15 tests passing, migrations, live smoke tests) |
 | **Phase 3** | **Execution Engine & State Machine** | Execution state machine, session progression, participant API | **COMPLETED** | Verified (34 tests passing, live smoke tests, snapshot isolation) |
-| **Phase 4** | **High-Precision Timing Engine** | `requestAnimationFrame`, sub-frame telemetry, jitter compensation | **PLANNED** | Pre-implementation plan required |
+| **Phase 4** | **High-Precision Timing Engine** | `requestAnimationFrame`, sub-frame telemetry, jitter compensation | **COMPLETED** | Verified (42 tests passing, 50-trial verification, browser PoC) |
 | **Phase 5** | **Results Aggregation & Analytics** | Researcher results queries, CSV/JSON export, latency summaries | **PLANNED** | Pre-implementation plan required |
 | **Phase 6** | **Randomization Engine** | Trial shuffling, block counterbalancing, Latin-square balancing | **PLANNED** | Pre-implementation plan required |
 | **Phase 7** | **Conditional Branching Engine** | Dynamic routing rules, performance-dependent trial jumping | **PLANNED** | Pre-implementation plan required |
@@ -139,14 +139,36 @@ To maintain complete architectural integrity, avoid uncoordinated dependencies, 
 
 ---
 
-## 6. Upcoming Phases Roadmap
+## 6. Phase 4 — High-Precision Timing Engine (COMPLETED)
 
-### Phase 4: High-Precision Timing Engine
-* **Goal**: Web-optimized timing subsystem for millisecond-accurate stimulus presentation and response capture.
-* **Key Deliverables**:
-  1. Double-buffered `requestAnimationFrame` render alignment.
-  2. High-resolution input event timestamp synchronization (`performance.now()`).
-  3. Telemetry capture: refresh rate estimation, hidden tab detection, and timing method tracking.
+### Objectives Achieved
+* Implemented the client-side `TimingController` (`src/timing/`) enforcing millisecond-resolution reaction time measurement via `performance.now()`.
+* Aligned visual stimulus presentation with the display refresh cycle using `requestAnimationFrame()`, explicitly distinguishing between the JavaScript scheduling point (`STIMULUS_PENDING_PRESENTATION`) and the physical rendering boundary (`STIMULUS_PRESENTED`).
+* Implemented the complete Phase 4 timing state model (`IDLE` → `PRE_STIMULUS` → `STIMULUS_PENDING_PRESENTATION` → `STIMULUS_PRESENTED` → `AWAITING_RESPONSE` → `RESPONSE_CAPTURED` → `TIMEOUT` / `COMPLETE`).
+* Built guards against anticipatory responses, duplicate keypresses, and late responses arriving after timeout.
+* Added environmental telemetry tracking display refresh rates (Hz) and detecting background tab throttling via `document.visibilityState`.
+* Developed a responsive standalone browser Proof-of-Concept (`public/timing-poc.html`) runnable independently from the backend.
+* Verified the timing engine across a 50-trial automated test run and 8 automated unit tests (42/42 tests passing across all suites).
+
+### Deliverables & Changes Created
+* **Timing Engine Module (`src/timing/`)**:
+  * `src/timing/timing-types.ts`: Lifecycle state definitions, trial inputs, timing result contracts.
+  * `src/timing/timing-controller.ts`: Frame-synchronized controller with full lifecycle and guards.
+  * `src/timing/timing-diagnostics.ts`: Statistical summary engine for verifying trial batches.
+  * `src/timing/index.ts`: Barrel exports.
+* **Standalone Browser PoC**:
+  * `public/timing-poc.html`: Interactive browser application for 50+ trial timing validation.
+  * `src/server/app.ts`: Static file middleware and `/timing-poc` endpoint.
+* **Testing & Scripts**:
+  * `tests/timing-engine.test.ts`: 8 comprehensive timing unit tests covering all edge cases.
+  * `scripts/verify-timing-poc.ts`: Automated 50-trial verification script.
+  * `docs/phase-4-checklist.md`: Phase 4 verification checklist.
+* **Git Status**:
+  * Implemented on branch `backend/timing-engine`.
+
+---
+
+## 7. Upcoming Phases Roadmap
 
 ### Phase 5: Results Aggregation & Analytics
 * **Goal**: Enable researchers to inspect, filter, and export participant performance datasets.
