@@ -13,7 +13,7 @@ This document serves as the master tracking file for the Manova Labs backend, co
 | **Phase 3** | **Execution Engine & State Machine** | Execution state machine, session progression, participant API | **COMPLETED** | Verified (34 tests passing, live smoke tests, snapshot isolation) |
 | **Phase 4** | **High-Precision Timing Engine** | `requestAnimationFrame`, sub-frame telemetry, jitter compensation | **COMPLETED** | Verified (42 tests passing, 50-trial verification, browser PoC) |
 | **Phase 5** | **Results Aggregation & Analytics** | Researcher results queries, CSV/JSON export, latency summaries | **COMPLETED** | Verified (51 tests passing, live smoke tests, JSON/CSV exports) |
-| **Phase 6** | **Randomization Engine** | Trial shuffling, block counterbalancing, Latin-square balancing | **PLANNED** | Pre-implementation plan required |
+| **Phase 6** | **Randomization Engine** | Seeded Fisher-Yates, deterministic PRNG, session trial order persistence | **COMPLETED** | Verified (66 tests passing, migration, live smoke tests, seed reproducibility) |
 | **Phase 7** | **Conditional Branching Engine** | Dynamic routing rules, performance-dependent trial jumping | **PLANNED** | Pre-implementation plan required |
 | **Phase 8** | **Authentication & Production Hardening** | JWT/Auth, IRB compliance, rate limiting, deployment | **PLANNED** | Pre-implementation plan required |
 
@@ -197,13 +197,41 @@ To maintain complete architectural integrity, avoid uncoordinated dependencies, 
 
 ---
 
-## 8. Upcoming Phases Roadmap
+## 8. Phase 6 — Stimulus & Trial Randomization Engine (COMPLETED)
 
-### Phase 6: Stimulus & Trial Randomization Engine
-* **Goal**: Algorithmic trial order shuffling and condition counterbalancing.
-* **Key Deliverables**:
-  1. Block randomization algorithms (Fisher-Yates shuffle with seed support for reproducibility).
-  2. Balanced Latin-square condition assignments across participant sessions.
+### Objectives Achieved
+* **Session-Level Randomization**: Trial order randomization evaluated strictly at session creation time; original `Experiment` definition and frozen `ExperimentVersion` snapshots remain 100% immutable.
+* **Deterministic Pseudo-Random Number Generation**: Implemented a pure TypeScript Mulberry32 PRNG with 32-bit FNV-1a seed hashing (`src/randomization/seeded-random.ts`), eliminating all dependence on non-deterministic `Math.random()`.
+* **Seeded Fisher-Yates (Knuth) Shuffle**: Built a non-mutating shuffle engine (`src/randomization/fisher-yates.ts`) that guarantees complete, non-duplicate trial permutations.
+* **Cryptographic Seed Generation**: Generates 128-bit CSPRNG seeds (`crypto.randomBytes(16).toString('hex')`) upon session start (`src/randomization/seed-generator.ts`).
+* **Database Persistence**: Extended `Session` model with `randomizationEnabled`, `randomizationSeed`, and `trialOrder` (`string[]`), fully capturing the execution order.
+* **Execution Engine Integration**: Updated `ExecutionEngine.advanceLinearSequence` and `SessionService` to advance along the persisted `trialOrder`, seamlessly preserving backward compatibility with fixed-order studies.
+* **Reproducibility & Auditability**: Any session's exact sequence can be reconstructed deterministically from its seed and snapshot.
+* **Snapshot Isolation**: Version bumping on published updates ensures existing randomized sessions continue on their original version and sequence without disruption.
+
+### Deliverables & Key Files
+* **Randomization Core**:
+  * `src/randomization/seeded-random.ts`: FNV-1a seed hasher and Mulberry32 generator.
+  * `src/randomization/fisher-yates.ts`: Seeded non-mutating Fisher-Yates shuffle.
+  * `src/randomization/seed-generator.ts`: Cryptographic seed generator.
+  * `src/randomization/index.ts`: Public module barrel export.
+* **Engine & Domain Updates**:
+  * `src/engine/execution-engine.ts`: SessionContext `trialOrder` support and linear sequence traversal.
+  * `src/domain/session.service.ts`: Session initialization with seed generation, shuffle execution, and order persistence.
+  * `src/domain/experiment.service.ts`: Automated version bumping on published experiment updates.
+  * `src/schemas/experiment.schema.ts` & `src/types/experiment.d.ts`: `config.randomization.enabled` schema.
+* **Database Migration**:
+  * `prisma/migrations/20260926065813_add_session_randomization_fields/`: Added `randomizationEnabled`, `randomizationSeed`, and `trialOrder` columns to `sessions`.
+* **Testing & Verification**:
+  * `tests/randomization.test.ts`: 15 comprehensive unit & integration tests covering PRNG uniformity, Fisher-Yates invariants, seed persistence, out-of-order rejection, and snapshot isolation.
+  * `scripts/smoke-test.ts`: Extended with live HTTP verification of 4-trial randomized experiment execution (17/17 passing).
+  * `docs/phase-6-checklist.md`: Complete technical checklist and verification audit.
+* **Git Status**:
+  * Implemented on branch `backend/randomization`.
+
+---
+
+## 9. Upcoming Phases Roadmap
 
 ### Phase 7: Dynamic Conditional Branching Engine
 * **Goal**: Performance-contingent trial routing.

@@ -124,6 +124,10 @@ export class ExperimentService {
       throw new NotFoundError(`Experiment '${id}' not found`);
     }
 
+    const isPublished = existing.status === 'PUBLISHED';
+    const newVersion = isPublished ? existing.version + 1 : existing.version;
+    const newStatus = isPublished ? 'DRAFT' : existing.status;
+
     return await prisma.$transaction(async (tx) => {
       // If trials are being replaced, delete existing and recreate
       if (validated.trials) {
@@ -138,6 +142,8 @@ export class ExperimentService {
           publicSlug: validated.publicSlug,
           generalInstructions: validated.generalInstructions,
           completionMessage: validated.completionMessage,
+          status: newStatus,
+          version: newVersion,
           config: validated.config ? (validated.config as unknown as Prisma.InputJsonValue) : undefined,
           trials: validated.trials
             ? {

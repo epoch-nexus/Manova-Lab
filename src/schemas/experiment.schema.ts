@@ -1,11 +1,16 @@
 import { z } from 'zod';
 import { trialSchema } from './trial.schema.js';
 
+export const randomizationConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+});
+
 export const experimentDisplayConfigSchema = z.object({
   displayMode: z.enum(['fullscreen', 'windowed']).default('fullscreen'),
   backgroundColor: z.string().default('#0F172A'),
   allowPause: z.boolean().default(false),
   showFeedback: z.boolean().default(true),
+  randomization: randomizationConfigSchema.optional().default({ enabled: false }),
 });
 
 export const createExperimentSchema = z.object({

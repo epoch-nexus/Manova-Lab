@@ -101,7 +101,10 @@ Creates a new experiment in `DRAFT` status owned by the authenticated researcher
     "displayMode": "fullscreen",
     "backgroundColor": "#F8FAFC",
     "allowPause": false,
-    "showFeedback": true
+    "showFeedback": true,
+    "randomization": {
+      "enabled": true
+    }
   },
   "trials": [
     {
@@ -355,7 +358,8 @@ Initializes an anonymous session for a published experiment using its public slu
 }
 ```
 > [!NOTE]
-> The `correctResponse` field is intentionally stripped from `firstTrial.expectedResponse` in participant responses to prevent participant-side inspection or tampering.
+> **Trial Order & Randomization (Phase 6)**:
+> If the published experiment has `config.randomization.enabled: true`, the backend computes a deterministic seeded Fisher-Yates permutation of all trial IDs at session creation time and stores the assigned sequence in `session.trialOrder`. `firstTrial` corresponds to `trialOrder[0]`. Subsequent calls to `GET /sessions/:sessionId/current-step` and responses to `POST /sessions/:sessionId/trials/:trialId/response` automatically follow this session-specific sequence without requiring any participant-side changes. The randomization seed is held internally on the session for scientific reproducibility.
 
 * **Error Responses**:
   * `404 Not Found`: `{ "error": { "code": "EXPERIMENT_NOT_FOUND", "message": "Study 'visual-rt-baseline' does not exist." } }`

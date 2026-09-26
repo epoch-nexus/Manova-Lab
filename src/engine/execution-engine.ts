@@ -20,6 +20,7 @@ export interface SessionContext {
   currentTrialId: string | null;
   currentTrialIndex: number;
   totalTrials: number;
+  trialOrder?: string[] | null;
 }
 
 export class ExecutionEngine {
@@ -55,6 +56,15 @@ export class ExecutionEngine {
       );
     }
 
+    const projectedNextTrialId =
+      session.trialOrder && session.trialOrder.length > 0
+        ? (session.trialOrder[session.currentTrialIndex + 1] ?? null)
+        : trial.nextTrialId;
+    const projectedOrderIndex =
+      session.trialOrder && session.trialOrder.length > 0
+        ? session.currentTrialIndex + 1
+        : trial.orderIndex;
+
     return {
       sessionId: session.id,
       experimentId: session.experimentId,
@@ -63,7 +73,7 @@ export class ExecutionEngine {
       executionState: session.executionState,
       currentTrialIndex: session.currentTrialIndex,
       totalTrials: session.totalTrials,
-      currentTrial: this.stripTrial(trial),
+      currentTrial: this.stripTrial(trial, projectedNextTrialId, projectedOrderIndex),
       generalInstructions: session.currentTrialIndex === 0 ? snapshot.generalInstructions : null,
       completionMessage: null,
       isCompleted: false,
@@ -99,7 +109,7 @@ export class ExecutionEngine {
 
   /**
    * Advances the session along the linear trial sequence.
-   * Does NOT evaluate conditional branching; follows nextTrialId pointer deterministically.
+   * Does NOT evaluate conditional branching; follows session.trialOrder or nextTrialId pointer deterministically.
    */
   advanceLinearSequence(
     session: SessionContext,
@@ -125,7 +135,47 @@ export class ExecutionEngine {
       );
     }
 
-    // Terminal trial reached
+    // If trialOrder is stored on session, follow it
+    if (session.trialOrder && session.trialOrder.length > 0) {
+      const nextTrialIndex = session.currentTrialIndex + 1;
+
+      // Terminal trial reached
+      if (nextTrialIndex >= session.trialOrder.length) {
+        return {
+          sessionStatus: 'COMPLETED',
+          executionState: 'COMPLETE',
+          nextTrialId: null,
+          nextTrialIndex: session.currentTrialIndex,
+          nextTrial: null,
+          isCompleted: true,
+          completionMessage:
+            snapshot.completionMessage ?? 'Thank you for participating! Your responses have been anonymously recorded.',
+        };
+      }
+
+      const nextTrialId = session.trialOrder[nextTrialIndex]!;
+      const nextTrial = snapshot.trials.find((t) => t.id === nextTrialId);
+      if (!nextTrial) {
+        throw new BadRequestError(
+          `Corrupted progression pointer: next trial '${nextTrialId}' missing from snapshot`,
+          'TRIAL_NOT_FOUND'
+        );
+      }
+
+      const projectedNextTrialId = session.trialOrder[nextTrialIndex + 1] ?? null;
+
+      return {
+        sessionStatus: 'IN_PROGRESS',
+        executionState: 'AWAITING_RESPONSE',
+        nextTrialId: nextTrial.id,
+        nextTrialIndex,
+        nextTrial: this.stripTrial(nextTrial, projectedNextTrialId, nextTrialIndex + 1),
+        isCompleted: false,
+        completionMessage: null,
+      };
+    }
+
+    // Fallback: Legacy progression using currentTrial.nextTrialId
     if (currentTrial.nextTrialId === null) {
       return {
         sessionStatus: 'COMPLETED',
@@ -164,7 +214,11 @@ export class ExecutionEngine {
   /**
    * Strips correctResponse from expectedResponse to ensure participant cannot inspect answer.
    */
-  stripTrial(trial: Trial): ParticipantTrial {
+  stripTrial(
+    trial: Trial,
+    projectedNextTrialId?: string | null,
+    projectedOrderIndex?: number
+  ): ParticipantTrial {
     const strippedExpected: ParticipantExpectedResponse =
       trial.expectedResponse.type === 'keypress'
         ? {
@@ -180,14 +234,14 @@ export class ExecutionEngine {
 
     return {
       id: trial.id,
-      orderIndex: trial.orderIndex,
+      orderIndex: projectedOrderIndex !== undefined ? projectedOrderIndex : trial.orderIndex,
       label: trial.label,
       instructions: trial.instructions,
       fixation: trial.fixation,
       stimulus: trial.stimulus,
       timingConfig: trial.timingConfig,
       expectedResponse: strippedExpected,
-      nextTrialId: trial.nextTrialId,
+      nextTrialId: projectedNextTrialId !== undefined ? projectedNextTrialId : trial.nextTrialId,
       branching: null,
     };
   }

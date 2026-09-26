@@ -13,6 +13,7 @@ import type { Experiment } from '../types/experiment.d.ts';
 import type { ExecutionStep, ParticipantTrial } from '../engine/execution-state.js';
 import { Prisma } from '@prisma/client';
 import crypto from 'crypto';
+import { generateRandomizationSeed, seededFisherYatesShuffle } from '../randomization/index.js';
 
 export interface StartSessionResult {
   sessionId: string;
@@ -84,7 +85,19 @@ export class SessionService {
       throw new BadRequestError('Published experiment snapshot contains no trials');
     }
 
-    const firstTrial = snapshot.trials[0]!;
+    const isRandomized = Boolean(snapshot.config?.randomization?.enabled);
+    const originalTrialIds = snapshot.trials.map((t) => t.id);
+
+    let seed: string | null = null;
+    let trialOrder: string[] = originalTrialIds;
+
+    if (isRandomized) {
+      seed = generateRandomizationSeed();
+      trialOrder = seededFisherYatesShuffle(originalTrialIds, seed);
+    }
+
+    const firstTrialId = trialOrder[0]!;
+    const firstTrial = snapshot.trials.find((t) => t.id === firstTrialId)!;
     const sessionId = `sess_${crypto.randomUUID()}`;
     const participantId = `part_anon_${crypto.randomUUID()}`;
 
@@ -98,6 +111,9 @@ export class SessionService {
         currentTrialId: firstTrial.id,
         currentTrialIndex: 0,
         totalTrials: snapshot.trials.length,
+        randomizationEnabled: isRandomized,
+        randomizationSeed: seed,
+        trialOrder: trialOrder as unknown as Prisma.InputJsonValue,
         clientEnvironment: (validated.clientEnvironment ?? {}) as Prisma.InputJsonValue,
         experimentId: experiment.id,
         experimentVersion: latestVersion.version,
@@ -105,13 +121,15 @@ export class SessionService {
       },
     });
 
+    const projectedNextTrialId = trialOrder[1] ?? null;
+
     return {
       sessionId,
       experimentId: experiment.id,
       experimentTitle: snapshot.title,
       generalInstructions: snapshot.generalInstructions,
       totalTrials: snapshot.trials.length,
-      firstTrial: this.engine.stripTrial(firstTrial),
+      firstTrial: this.engine.stripTrial(firstTrial, projectedNextTrialId, 1),
     };
   }
 
@@ -131,6 +149,7 @@ export class SessionService {
     }
 
     const snapshot = session.version.snapshotData as unknown as Experiment;
+    const rawTrialOrder = session.trialOrder as string[] | null;
 
     return this.engine.resolveCurrentStep(
       {
@@ -141,6 +160,7 @@ export class SessionService {
         currentTrialId: session.currentTrialId,
         currentTrialIndex: session.currentTrialIndex,
         totalTrials: session.totalTrials,
+        trialOrder: rawTrialOrder,
       },
       snapshot
     );
@@ -229,6 +249,8 @@ export class SessionService {
         },
       });
 
+      const rawTrialOrder = session.trialOrder as string[] | null;
+
       // 5. Advance linear state machine
       const transition = this.engine.advanceLinearSequence(
         {
@@ -239,6 +261,7 @@ export class SessionService {
           currentTrialId: session.currentTrialId,
           currentTrialIndex: session.currentTrialIndex,
           totalTrials: session.totalTrials,
+          trialOrder: rawTrialOrder,
         },
         snapshot,
         trialId

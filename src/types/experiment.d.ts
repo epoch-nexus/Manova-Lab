@@ -133,11 +133,16 @@ export interface Trial {
 // 5. Experiment Entity
 // ==========================================
 
+export interface ExperimentRandomizationConfig {
+  enabled: boolean;
+}
+
 export interface ExperimentDisplayConfig {
   displayMode: 'fullscreen' | 'windowed';
   backgroundColor: string;
   allowPause: boolean;
   showFeedback: boolean;
+  randomization?: ExperimentRandomizationConfig;
 }
 
 export interface Experiment {

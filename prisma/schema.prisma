@@ -125,6 +125,11 @@ model Session {
   updatedAt            DateTime          @updatedAt
   completedAt          DateTime?
 
+  // Phase 6: Trial randomization
+  randomizationEnabled Boolean           @default(false)
+  randomizationSeed    String?
+  trialOrder           Json?
+
   experimentId         String
   experimentVersion    Int
   experimentSnapshotId String
