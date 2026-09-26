@@ -2,6 +2,7 @@ import express, { type Application, type Request, type Response } from 'express'
 import cors from 'cors';
 import { experimentRouter } from './routes/experiment.routes.js';
 import { participantRouter } from './routes/participant.routes.js';
+import { resultsRouter } from './routes/results.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 export function createApp(): Application {
@@ -38,6 +39,10 @@ export function createApp(): Application {
   // Mount Participant Execution Router (both versioned and direct root paths)
   app.use('/api/v1/participant', participantRouter);
   app.use('/participant', participantRouter);
+
+  // Mount Researcher Results Analytics & Export Router
+  app.use('/api/v1/experiments/:experimentId/results', resultsRouter);
+  app.use('/experiments/:experimentId/results', resultsRouter);
 
   // Centralized Error Handling Middleware
   app.use(errorHandler);

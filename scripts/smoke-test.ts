@@ -229,7 +229,7 @@ async function runSmokeTests() {
     }
 
     // 12. Error Case: Response After Session Completion
-    console.log('[12/12] Testing 409 SESSION_ALREADY_COMPLETED');
+    console.log('[12/16] Testing 409 SESSION_ALREADY_COMPLETED');
     const afterCompleteRes = await fetch(`${baseUrl}/api/v1/participant/sessions/${sessionId}/trials/${trial2Id}/response`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -241,7 +241,51 @@ async function runSmokeTests() {
       throw new Error('409 session completed test failed');
     }
 
-    console.log('--- ALL 12 LIVE SMOKE TESTS PASSED CLEANLY! ---');
+    // 13. Phase 5: Query Raw Results (GET /api/v1/experiments/:id/results)
+    console.log('[13/16] Testing GET /api/v1/experiments/:id/results');
+    const resultsRes = await fetch(`${baseUrl}/api/v1/experiments/${expId}/results`);
+    const resultsData = await resultsRes.json();
+    console.log('  Status:', resultsRes.status, `Total results: ${resultsData.total}`);
+    if (resultsRes.status !== 200 || resultsData.total < 2) {
+      throw new Error('Raw results query failed');
+    }
+
+    // 14. Phase 5: Query Summary Statistics (GET /api/v1/experiments/:id/results/summary)
+    console.log('[14/16] Testing GET /api/v1/experiments/:id/results/summary');
+    const summaryRes = await fetch(`${baseUrl}/api/v1/experiments/${expId}/results/summary`);
+    const summaryData = await summaryRes.json();
+    console.log('  Status:', summaryRes.status, `Total responses: ${summaryData.totalResponses}, Rate: ${summaryData.responseRate}`);
+    if (summaryRes.status !== 200 || summaryData.totalResponses < 2) {
+      throw new Error('Results summary query failed');
+    }
+
+    // 15. Phase 5: JSON Export (GET /api/v1/experiments/:id/results/export.json)
+    console.log('[15/16] Testing GET /api/v1/experiments/:id/results/export.json');
+    const jsonExportRes = await fetch(`${baseUrl}/api/v1/experiments/${expId}/results/export.json`);
+    const jsonExportData = await jsonExportRes.json();
+    const jsonDisposition = jsonExportRes.headers.get('content-disposition');
+    console.log('  Status:', jsonExportRes.status, `Disposition: ${jsonDisposition}, Total exported: ${jsonExportData.totalResults}`);
+    if (jsonExportRes.status !== 200 || !jsonDisposition?.includes('attachment;') || jsonExportData.totalResults < 2) {
+      throw new Error('JSON export failed');
+    }
+
+    // 16. Phase 5: CSV Export (GET /api/v1/experiments/:id/results/export.csv)
+    console.log('[16/16] Testing GET /api/v1/experiments/:id/results/export.csv');
+    const csvExportRes = await fetch(`${baseUrl}/api/v1/experiments/${expId}/results/export.csv`);
+    const csvText = await csvExportRes.text();
+    const csvDisposition = csvExportRes.headers.get('content-disposition');
+    const csvLines = csvText.trim().split('\r\n');
+    console.log('  Status:', csvExportRes.status, `Disposition: ${csvDisposition}, CSV Header: ${csvLines[0]}`);
+    if (
+      csvExportRes.status !== 200 ||
+      !csvDisposition?.includes('attachment;') ||
+      !csvLines[0]?.includes('sessionId') ||
+      csvLines[0]?.includes('participantId') // Must NOT contain participantId
+    ) {
+      throw new Error('CSV export failed');
+    }
+
+    console.log('--- ALL 16 LIVE SMOKE TESTS PASSED CLEANLY! ---');
   } finally {
     await prisma.sessionResponse.deleteMany();
     await prisma.session.deleteMany();

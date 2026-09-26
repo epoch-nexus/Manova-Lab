@@ -139,11 +139,19 @@ model SessionResponse {
   id                String   @id @default(uuid())
   trialId           String
   submittedResponse String?
+  isCorrect         Boolean?
+  reactionTimeMs    Float?
+  timedOut          Boolean  @default(false)
+  timingMeasurement Json?
+  clientMetadata    Json?
   submittedAt       DateTime @default(now())
 
   sessionId         String
   session           Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@unique([sessionId, trialId])
+  @@index([sessionId])
+  @@index([trialId])
+  @@index([submittedAt])
   @@map("session_responses")
 }

@@ -485,3 +485,116 @@ When submitting the response to the final trial (`nextTrialId === null`):
   "status": "ABANDONED"
 }
 ```
+
+---
+
+## 6. Researcher Results, Analytics & Export API (Phase 5)
+
+All researcher result endpoints are scoped to an experiment by ID: `/api/v1/experiments/:experimentId/results` (or `/experiments/:experimentId/results`).
+
+### 6.1 List Raw Trial Results
+Retrieves trial-level participant response records with optional filtering.
+
+* **Method**: `GET`
+* **URL**: `/api/v1/experiments/:experimentId/results`
+* **Query Parameters**:
+  * `sessionId` (`string`, optional): Filter by participant session.
+  * `trialId` (`string`, optional): Filter by trial ID.
+  * `timedOut` (`boolean`, optional): `true` to filter timeouts, `false` for responded trials.
+  * `from` / `to` (`ISO 8601`, optional): Filter responses by submission timestamp range.
+  * `limit` / `offset` (`number`, optional): Pagination controls.
+* **Success Response**: `200 OK`
+```json
+{
+  "experimentId": "4375f3d0-1f61-4e0e-8651-086697015227",
+  "total": 2,
+  "results": [
+    {
+      "id": "resp_3d4e5f6a-7b8c-4d1e-2f3a-4b5c6d7e8f9a",
+      "sessionId": "sess_da0b1c16-44f8-42c7-93fb-5da030848015",
+      "experimentId": "4375f3d0-1f61-4e0e-8651-086697015227",
+      "experimentVersion": 1,
+      "trialId": "B21E3A3A-68FB-4511-9379-53D78015DB00",
+      "submittedResponse": "Space",
+      "isCorrect": true,
+      "reactionTimeMs": 242.35,
+      "timedOut": false,
+      "timingMeasurement": {
+        "stimulusOnsetTimestamp": 1727337600750.2,
+        "responseTimestamp": 1727337600992.55,
+        "calculatedLatencyMs": 242.35,
+        "hardwarePrecision": {
+          "timingMethod": "requestAnimationFrame",
+          "displayRefreshRateEstimateHz": 60,
+          "hiddenTabDetected": false
+        }
+      },
+      "clientMetadata": {
+        "userAgent": "Mozilla/5.0 ...",
+        "screenResolution": "1920x1080"
+      },
+      "submittedAt": "2026-09-26T10:30:00.993Z"
+    }
+  ]
+}
+```
+
+---
+
+### 6.2 Aggregate Summary Statistics
+Calculates descriptive statistics (mean RT, median RT, sample standard deviation, response rate, accuracy rate) across all trials or filtered to a single trial.
+
+* **Method**: `GET`
+* **URL**: `/api/v1/experiments/:experimentId/results/summary`
+* **Query Parameters**:
+  * `trialId` (`string`, optional): Aggregate results for a specific trial.
+* **Success Response**: `200 OK`
+```json
+{
+  "experimentId": "4375f3d0-1f61-4e0e-8651-086697015227",
+  "trialId": null,
+  "totalSessions": 10,
+  "completedSessions": 9,
+  "abandonedSessions": 1,
+  "totalResponses": 20,
+  "totalTimeouts": 2,
+  "responseRate": 0.9,
+  "correctResponses": 17,
+  "incorrectResponses": 3,
+  "accuracyRate": 0.85,
+  "meanReactionTimeMs": 248.512,
+  "medianReactionTimeMs": 242.35,
+  "minReactionTimeMs": 198.12,
+  "maxReactionTimeMs": 340.5,
+  "standardDeviationReactionTimeMs": 32.145
+}
+```
+
+---
+
+### 6.3 JSON Export
+Downloads complete trial-level records as a machine-readable JSON file.
+
+* **Method**: `GET`
+* **URL**: `/api/v1/experiments/:experimentId/results/export.json`
+* **Response Headers**:
+  * `Content-Type: application/json`
+  * `Content-Disposition: attachment; filename="experiment_<id>_results.json"`
+* **Success Response**: `200 OK`
+
+---
+
+### 6.4 CSV Export
+Downloads complete trial-level records as a RFC 4180 compliant CSV file without participant identifiers to preserve anonymity.
+
+* **Method**: `GET`
+* **URL**: `/api/v1/experiments/:experimentId/results/export.csv`
+* **Response Headers**:
+  * `Content-Type: text/csv; charset=utf-8`
+  * `Content-Disposition: attachment; filename="experiment_<id>_results.csv"`
+* **Success Response**: `200 OK`
+* **CSV Format**:
+```csv
+sessionId,experimentId,experimentVersion,trialId,submittedResponse,isCorrect,reactionTimeMs,timedOut,stimulusOnsetTimestamp,responseTimestamp,timingMethod,displayRefreshRateEstimateHz,hiddenTabDetected,submittedAt
+sess_...,exp_...,1,trial_...,Space,true,242.35,false,1727337600750.2,1727337600992.55,requestAnimationFrame,60,false,2026-09-26T10:30:00.993Z
+```

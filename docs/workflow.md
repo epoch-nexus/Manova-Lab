@@ -12,7 +12,7 @@ This document serves as the master tracking file for the Manova Labs backend, co
 | **Phase 2** | **Runtime Validation & Database Persistence** | Zod schemas, PostgreSQL + Prisma, REST API server implementation | **COMPLETED** | Verified (15 tests passing, migrations, live smoke tests) |
 | **Phase 3** | **Execution Engine & State Machine** | Execution state machine, session progression, participant API | **COMPLETED** | Verified (34 tests passing, live smoke tests, snapshot isolation) |
 | **Phase 4** | **High-Precision Timing Engine** | `requestAnimationFrame`, sub-frame telemetry, jitter compensation | **COMPLETED** | Verified (42 tests passing, 50-trial verification, browser PoC) |
-| **Phase 5** | **Results Aggregation & Analytics** | Researcher results queries, CSV/JSON export, latency summaries | **PLANNED** | Pre-implementation plan required |
+| **Phase 5** | **Results Aggregation & Analytics** | Researcher results queries, CSV/JSON export, latency summaries | **COMPLETED** | Verified (51 tests passing, live smoke tests, JSON/CSV exports) |
 | **Phase 6** | **Randomization Engine** | Trial shuffling, block counterbalancing, Latin-square balancing | **PLANNED** | Pre-implementation plan required |
 | **Phase 7** | **Conditional Branching Engine** | Dynamic routing rules, performance-dependent trial jumping | **PLANNED** | Pre-implementation plan required |
 | **Phase 8** | **Authentication & Production Hardening** | JWT/Auth, IRB compliance, rate limiting, deployment | **PLANNED** | Pre-implementation plan required |
@@ -168,13 +168,36 @@ To maintain complete architectural integrity, avoid uncoordinated dependencies, 
 
 ---
 
-## 7. Upcoming Phases Roadmap
+## 7. Phase 5 — Results Aggregation, Analytics & Data Export (COMPLETED)
 
-### Phase 5: Results Aggregation & Analytics
-* **Goal**: Enable researchers to inspect, filter, and export participant performance datasets.
-* **Key Deliverables**:
-  1. Summary endpoints (mean RT, error rates, condition comparisons).
-  2. Raw data export in standardized CSV and JSON formats for external statistical packages (R, Python/Pandas, SPSS).
+### Objectives Achieved
+* Extended `SessionResponse` in PostgreSQL with `reactionTimeMs`, `isCorrect`, `timedOut`, `timingMeasurement`, and `clientMetadata`, eliminating persistence gaps while preserving Phase 3 session models.
+* Evaluated trial correctness strictly against the frozen, immutable `ExperimentVersion` snapshot bound to the participant session.
+* Implemented `ResultsService` (`src/domain/results.service.ts`) providing raw data queries, filtering (`sessionId`, `trialId`, `timedOut`, date ranges), and statistical aggregations (mean, median, sample standard deviation, response rate, accuracy rate).
+* Implemented downloadable JSON export (`GET .../export.json`) and RFC 4180 compliant CSV export (`GET .../export.csv`) excluding `participantId` to preserve anonymity.
+* Added 9 comprehensive automated tests (51/51 tests passing across 5 suites) and extended live smoke tests to 16 end-to-end HTTP steps.
+
+### Deliverables & Changes Created
+* **Database & Persistence**:
+  * `prisma/schema.prisma`: Added `reactionTimeMs`, `isCorrect`, `timedOut`, `timingMeasurement`, `clientMetadata`, and indexes to `SessionResponse`.
+  * Applied migration `20260926064429_add_session_response_results_fields`.
+  * `src/domain/session.service.ts`: Updated response recording with snapshot correctness evaluation and telemetry.
+* **Domain & Validation (`src/domain/`, `src/schemas/`)**:
+  * `src/schemas/results.schema.ts`: Zod query validation schemas.
+  * `src/domain/results.service.ts`: Raw querying, statistics calculations, and export formatters.
+* **Server Routes**:
+  * `src/server/routes/results.routes.ts`: Endpoints for results, summary, export.json, and export.csv.
+  * Mounted in `src/server/app.ts` under `/api/v1/experiments/:experimentId/results` and `/experiments/:experimentId/results`.
+* **Testing & Scripts**:
+  * `tests/results.test.ts`: 9 automated integration tests covering all features.
+  * `scripts/smoke-test.ts`: Extended with 4 live Phase 5 verification tests (16/16 passing).
+  * `docs/phase-5-checklist.md`: Phase 5 verification checklist.
+* **Git Status**:
+  * Implemented on branch `backend/results-analytics`.
+
+---
+
+## 8. Upcoming Phases Roadmap
 
 ### Phase 6: Stimulus & Trial Randomization Engine
 * **Goal**: Algorithmic trial order shuffling and condition counterbalancing.

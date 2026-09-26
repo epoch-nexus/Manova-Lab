@@ -25,6 +25,7 @@ export interface StartSessionResult {
 
 export interface SubmitResponseApiResult {
   responseId: string;
+  isCorrect?: boolean | null;
   sessionStatus: 'IN_PROGRESS' | 'COMPLETED' | 'ABANDONED';
   nextTrial: ParticipantTrial | null;
   isCompleted: boolean;
@@ -199,7 +200,20 @@ export class SessionService {
       // 3. Validate response according to expected response criteria
       this.engine.validateResponse(currentTrial, validated.submittedResponse ?? null);
 
-      // 4. Record session response (enforces unique constraint per session & trial)
+      // Evaluate correctness against the frozen ExperimentVersion snapshot
+      let isCorrect: boolean | null = null;
+      if (currentTrial.expectedResponse.evaluationMode === 'exact_match') {
+        if (validated.timedOut || !validated.submittedResponse) {
+          isCorrect = false;
+        } else {
+          isCorrect =
+            validated.submittedResponse === currentTrial.expectedResponse.correctResponse;
+        }
+      } else if (currentTrial.expectedResponse.evaluationMode === 'none') {
+        isCorrect = null;
+      }
+
+      // 4. Record session response with timing telemetry (enforces unique constraint per session & trial)
       const responseId = `resp_${crypto.randomUUID()}`;
       await tx.sessionResponse.create({
         data: {
@@ -207,6 +221,11 @@ export class SessionService {
           sessionId: session.id,
           trialId: trialId,
           submittedResponse: validated.submittedResponse ?? null,
+          isCorrect,
+          reactionTimeMs: validated.reactionTimeMs ?? null,
+          timedOut: validated.timedOut ?? false,
+          timingMeasurement: (validated.timingMeasurement ?? Prisma.DbNull) as Prisma.InputJsonValue,
+          clientMetadata: (validated.clientMetadata ?? Prisma.DbNull) as Prisma.InputJsonValue,
         },
       });
 
@@ -240,6 +259,7 @@ export class SessionService {
       if (transition.isCompleted) {
         return {
           responseId,
+          isCorrect,
           sessionStatus: 'COMPLETED',
           nextTrial: null,
           isCompleted: true,
@@ -249,6 +269,7 @@ export class SessionService {
 
       return {
         responseId,
+        isCorrect,
         sessionStatus: 'IN_PROGRESS',
         nextTrial: transition.nextTrial,
         isCompleted: false,
