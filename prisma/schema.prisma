@@ -12,6 +12,22 @@ enum ExperimentStatus {
   PUBLISHED
 }
 
+enum SessionStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
+
+enum ExecutionState {
+  INSTRUCTION
+  TRIAL
+  STIMULUS
+  AWAITING_RESPONSE
+  RECORDED
+  NEXT_TRIAL
+  COMPLETE
+}
+
 model Experiment {
   id                  String              @id @default(uuid())
   title               String
@@ -91,6 +107,43 @@ model ExperimentVersion {
 
   experimentId        String
   experiment          Experiment        @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  sessions            Session[]
 
   @@map("experiment_versions")
+}
+
+model Session {
+  id                   String            @id @default(uuid())
+  participantId        String            @default(uuid())
+  status               SessionStatus     @default(IN_PROGRESS)
+  executionState       ExecutionState    @default(AWAITING_RESPONSE)
+  currentTrialId       String?
+  currentTrialIndex    Int               @default(0)
+  totalTrials          Int
+  clientEnvironment    Json?
+  startedAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  completedAt          DateTime?
+
+  experimentId         String
+  experimentVersion    Int
+  experimentSnapshotId String
+
+  version              ExperimentVersion @relation(fields: [experimentSnapshotId], references: [snapshotId], onDelete: Cascade)
+  responses            SessionResponse[]
+
+  @@map("sessions")
+}
+
+model SessionResponse {
+  id                String   @id @default(uuid())
+  trialId           String
+  submittedResponse String?
+  submittedAt       DateTime @default(now())
+
+  sessionId         String
+  session           Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, trialId])
+  @@map("session_responses")
 }

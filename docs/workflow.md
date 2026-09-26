@@ -10,7 +10,7 @@ This document serves as the master tracking file for the Manova Labs backend, co
 | :--- | :--- | :--- | :--- | :--- |
 | **Phase 1** | **Experiment Schema & API Contract** | Data contracts, schemas, TypeScript types, examples, architecture | **COMPLETED** | Verified & committed to `origin/main` |
 | **Phase 2** | **Runtime Validation & Database Persistence** | Zod schemas, PostgreSQL + Prisma, REST API server implementation | **COMPLETED** | Verified (15 tests passing, migrations, live smoke tests) |
-| **Phase 3** | **Execution Engine & State Machine** | Client-side runner, state transitions, trial flow coordinator | **PLANNED** | Pre-implementation plan required |
+| **Phase 3** | **Execution Engine & State Machine** | Execution state machine, session progression, participant API | **COMPLETED** | Verified (34 tests passing, live smoke tests, snapshot isolation) |
 | **Phase 4** | **High-Precision Timing Engine** | `requestAnimationFrame`, sub-frame telemetry, jitter compensation | **PLANNED** | Pre-implementation plan required |
 | **Phase 5** | **Results Aggregation & Analytics** | Researcher results queries, CSV/JSON export, latency summaries | **PLANNED** | Pre-implementation plan required |
 | **Phase 6** | **Randomization Engine** | Trial shuffling, block counterbalancing, Latin-square balancing | **PLANNED** | Pre-implementation plan required |
@@ -106,14 +106,40 @@ To maintain complete architectural integrity, avoid uncoordinated dependencies, 
 
 ---
 
-## 5. Upcoming Phases Roadmap
+## 5. Phase 3 — Experiment Execution Engine & State Machine (COMPLETED)
 
-### Phase 3: Execution Engine & State Machine
-* **Goal**: Client-side execution coordinator that steps through the experimental protocol.
-* **Key Deliverables**:
-  1. Finite state machine (`instruction` → `trial` → `stimulus` → `awaiting-response` → `response-recorded` → `next-trial` → `complete`).
-  2. Event-driven interface for Harikrishna's frontend player to mount stimuli, trigger visual transitions, and display fixation crosses.
-  3. Automatic transition upon final trial completion.
+### Objectives Achieved
+* Implemented the pure `ExecutionEngine` state machine in `src/engine/` executing published experiments from start to complete.
+* Implemented anonymous participant sessions permanently bound to immutable published `ExperimentVersion` snapshots.
+* Designed and executed the mandatory Snapshot Immutability test verifying that modifying an experiment to Version 2 never alters an in-flight session's Version 1 definition.
+* Built atomic linear progression using `nextTrialId` pointers and enforced response concurrency protection via PostgreSQL transactions.
+* Created the Participant API endpoints (`POST .../sessions`, `GET .../sessions/:id`, `POST .../response`, `POST .../abandon`) matching `docs/api.md`.
+* Developed a 34-test automated test suite and 12-request live smoke test suite with 100% pass rate.
+
+### Deliverables & Changes Created
+* **Database & Persistence**:
+  * Added `Session` and `SessionResponse` models to `prisma/schema.prisma`.
+  * Applied migration `20260926060339_add_participant_sessions`.
+* **Execution Engine (`src/engine/`)**:
+  * `src/engine/execution-state.ts`: Execution state types and participant-safe trial projections.
+  * `src/engine/execution-engine.ts`: Core state machine, step resolution, and linear advancement.
+* **Domain & Validation**:
+  * `src/schemas/participant.schema.ts`: Validation schemas for session start and responses.
+  * `src/domain/session.service.ts`: Session lifecycle management and transactional persistence.
+* **Server Routes**:
+  * `src/server/routes/participant.routes.ts`: Participant execution endpoints.
+  * Mounted in `src/server/app.ts` under `/api/v1/participant` and `/participant`.
+* **Testing & Verification**:
+  * `tests/execution-engine.test.ts`: 9 unit tests for the pure state machine.
+  * `tests/participant-execution.test.ts`: 10 integration tests against live PostgreSQL.
+  * `scripts/smoke-test.ts`: Extended with 12 live end-to-end HTTP smoke tests.
+  * `docs/phase-3-checklist.md`: Phase 3 verification checklist.
+* **Git Status**:
+  * Implemented on branch `backend/experiment-engine`.
+
+---
+
+## 6. Upcoming Phases Roadmap
 
 ### Phase 4: High-Precision Timing Engine
 * **Goal**: Web-optimized timing subsystem for millisecond-accurate stimulus presentation and response capture.
