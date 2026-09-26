@@ -9,7 +9,7 @@ This document serves as the master tracking file for the Manova Labs backend, co
 | Phase | Title | Focus Area | Status | Verification Gate |
 | :--- | :--- | :--- | :--- | :--- |
 | **Phase 1** | **Experiment Schema & API Contract** | Data contracts, schemas, TypeScript types, examples, architecture | **COMPLETED** | Verified & committed to `origin/main` |
-| **Phase 2** | **Runtime Validation & Database Persistence** | Zod schemas, ORM / database setup, REST API server implementation | **PLANNED** | Awaiting user plan verification |
+| **Phase 2** | **Runtime Validation & Database Persistence** | Zod schemas, PostgreSQL + Prisma, REST API server implementation | **COMPLETED** | Verified (15 tests passing, migrations, live smoke tests) |
 | **Phase 3** | **Execution Engine & State Machine** | Client-side runner, state transitions, trial flow coordinator | **PLANNED** | Pre-implementation plan required |
 | **Phase 4** | **High-Precision Timing Engine** | `requestAnimationFrame`, sub-frame telemetry, jitter compensation | **PLANNED** | Pre-implementation plan required |
 | **Phase 5** | **Results Aggregation & Analytics** | Researcher results queries, CSV/JSON export, latency summaries | **PLANNED** | Pre-implementation plan required |
@@ -68,16 +68,45 @@ To maintain complete architectural integrity, avoid uncoordinated dependencies, 
 
 ---
 
-## 4. Upcoming Phases Roadmap
+## 4. Phase 2 — Runtime Validation & Database Persistence (COMPLETED)
 
-### Phase 2: Runtime Validation & Database Persistence
-* **Goal**: Implement runtime schema validation (e.g. Zod), database persistence (e.g., PostgreSQL / SQLite via Prisma), and real HTTP server routes matching `docs/api.md`.
-* **Prerequisite**: Implementation Plan approved by Atharva.
-* **Key Deliverables**:
-  1. Runtime Zod schemas in `src/schemas/` validating input against `src/types/experiment.d.ts`.
-  2. Database schema & migrations matching the conceptual model (Experiments, Trials, Stimuli, Sessions, Responses, Snapshots).
-  3. HTTP Server and controller handlers for Researcher API (`/api/v1/experiments`) and Participant API (`/api/v1/participant`).
-  4. Integration tests verifying end-to-end CRUD and response capture.
+### Objectives Achieved
+* Built concrete PostgreSQL persistence using Prisma 5.22, with automated migrations and JSONB storage for flexible trial/stimulus configurations.
+* Implemented strict runtime validation via Zod 3.23 in `src/schemas/`, enforcing trial uniqueness, non-empty trials, pointer integrity, and acyclic terminal paths.
+* Implemented the Researcher Experiment REST API endpoints (`/api/v1/experiments` and `/experiments`) using Express 5, matching `docs/api.md` byte-for-byte.
+* Created centralized error handling returning uniform `{ error: { code, message, details } }` envelopes across all status codes (400, 404, 409, 422, 500).
+* Implemented the immutable version snapshot generator on `POST /experiments/:id/publish`, freezing study definitions into the `experiment_versions` table.
+* Developed an automated test suite (15/15 tests passing) and a live HTTP smoke test script (9/9 requests passing).
+
+### Deliverables & Changes Created
+* **Database & Persistence**:
+  * `prisma/schema.prisma`: Models for `Experiment`, `Trial`, `Stimulus`, `ExpectedResponse`, `ExperimentVersion`. Zero participant/session tables.
+  * `prisma/migrations/20260926055133_init_experiment_persistence/migration.sql`: Initial PostgreSQL schema migration.
+  * `src/db/prisma.ts`: PrismaClient singleton.
+* **Validation Schemas (`src/schemas/`)**:
+  * `src/schemas/stimulus.schema.ts`: Text & image discriminated union schemas.
+  * `src/schemas/trial.schema.ts`: Fixation, timingConfig, expectedResponse schemas.
+  * `src/schemas/experiment.schema.ts`: Experiment CRUD & publishing graph validation.
+  * `src/schemas/index.ts`: Unified export barrel.
+* **Domain & Services**:
+  * `src/domain/experiment.service.ts`: CRUD, trial mapping, publishing validation, and snapshot generator.
+* **HTTP Server & Routing**:
+  * `src/server/errors.ts`: Domain error classes (`NotFoundError`, `BadRequestError`, `ValidationError`, `ConflictError`).
+  * `src/server/middleware/errorHandler.ts`: Centralized error middleware.
+  * `src/server/routes/experiment.routes.ts`: Express router for Researcher API.
+  * `src/server/app.ts`: Application factory with CORS, JSON parsing, healthcheck, and routes.
+  * `src/index.ts`: Development server entrypoint.
+* **Testing & Scripts**:
+  * `jest.config.cjs`: ESM Jest configuration for TypeScript.
+  * `tests/experiments.test.ts`: Integration test suite (15 test cases).
+  * `scripts/smoke-test.ts`: Live HTTP smoke test script (9 test cases).
+  * `docs/phase-2-checklist.md`: Phase 2 verification checklist.
+* **Git Status**:
+  * Implemented on branch `backend/api`.
+
+---
+
+## 5. Upcoming Phases Roadmap
 
 ### Phase 3: Execution Engine & State Machine
 * **Goal**: Client-side execution coordinator that steps through the experimental protocol.

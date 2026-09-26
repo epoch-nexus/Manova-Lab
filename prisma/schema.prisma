@@ -1,0 +1,96 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum ExperimentStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model Experiment {
+  id                  String              @id @default(uuid())
+  title               String
+  description         String
+  status              ExperimentStatus    @default(DRAFT)
+  version             Int                 @default(1)
+  ownerResearcherId   String              @default("res_anonymous_researcher")
+  publicSlug          String              @unique
+  generalInstructions String?
+  completionMessage   String?
+  config              Json                // displayMode, backgroundColor, allowPause, showFeedback
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  publishedAt         DateTime?
+
+  trials              Trial[]
+  versions            ExperimentVersion[]
+
+  @@map("experiments")
+}
+
+model Trial {
+  id                  String            @id @default(uuid())
+  orderIndex          Int
+  label               String?
+  instructions        String?
+  fixation            Json?             // { enabled, durationMs, symbol, color, fontSize }
+  timingConfig        Json              // { preStimulusDelayMs, stimulusDurationMs, responseTimeoutMs, allowEarlyResponse, waitForResponse }
+  nextTrialId         String?           // Pointer to subsequent trial (branching seam)
+  branching           Json?             // Reserved conditional branching rule
+
+  experimentId        String
+  experiment          Experiment        @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+
+  stimulus            Stimulus?
+  expectedResponse    ExpectedResponse?
+
+  @@map("trials")
+}
+
+model Stimulus {
+  id                  String            @id @default(uuid())
+  type                String            // 'text' | 'image' | 'audio' | 'video'
+  content             String?           // Text stimulus content
+  url                 String?           // Image/media asset URL
+  altText             String?           // Alt text for image
+  styling             Json?             // CSS styling hints
+  metadata            Json?             // Researcher annotations
+
+  trialId             String            @unique
+  trial               Trial             @relation(fields: [trialId], references: [id], onDelete: Cascade)
+
+  @@map("stimuli")
+}
+
+model ExpectedResponse {
+  id                  String            @id @default(uuid())
+  type                String            // 'keypress' | 'button_click'
+  allowedKeys         String[]          // e.g. ["Space", "KeyF"]
+  allowedButtons      String[]          // e.g. ["btn_left", "btn_right"]
+  correctResponse     String?           // Expected correct answer
+  evaluationMode      String            // 'exact_match' | 'none'
+
+  trialId             String            @unique
+  trial               Trial             @relation(fields: [trialId], references: [id], onDelete: Cascade)
+
+  @@map("expected_responses")
+}
+
+model ExperimentVersion {
+  id                  String            @id @default(uuid())
+  snapshotId          String            @unique // e.g. snap_<expId>_v<version>
+  version             Int
+  publicSlug          String
+  publishedAt         DateTime          @default(now())
+  snapshotData        Json              // Complete frozen experiment definition
+
+  experimentId        String
+  experiment          Experiment        @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+
+  @@map("experiment_versions")
+}
