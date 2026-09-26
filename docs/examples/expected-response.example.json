@@ -1,0 +1,8 @@
+{
+  "type": "keypress",
+  "allowedKeys": [
+    "Space"
+  ],
+  "correctResponse": "Space",
+  "evaluationMode": "exact_match"
+}

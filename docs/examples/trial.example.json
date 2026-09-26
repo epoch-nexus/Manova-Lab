@@ -1,0 +1,41 @@
+{
+  "id": "trial_4a5b6c7d-8e9f-4a1b-2c3d-4e5f6a7b8c9d",
+  "orderIndex": 1,
+  "label": "Trial 1 - Congruent Target",
+  "instructions": "Press the SPACEBAR as rapidly as possible when you see the letter X appear.",
+  "fixation": {
+    "enabled": true,
+    "durationMs": 750,
+    "symbol": "+",
+    "color": "#64748B",
+    "fontSize": "32px"
+  },
+  "stimulus": {
+    "id": "stim_8f9a2b1c-3d4e-4f5a-b6c7-d8e9f01a2b3c",
+    "type": "text",
+    "content": "X",
+    "styling": {
+      "fontSize": "48px",
+      "fontWeight": "bold",
+      "color": "#1E293B",
+      "fontFamily": "Inter, sans-serif"
+    }
+  },
+  "timingConfig": {
+    "preStimulusDelayMs": 750,
+    "stimulusDurationMs": 2000,
+    "responseTimeoutMs": 3000,
+    "allowEarlyResponse": false,
+    "waitForResponse": false
+  },
+  "expectedResponse": {
+    "type": "keypress",
+    "allowedKeys": [
+      "Space"
+    ],
+    "correctResponse": "Space",
+    "evaluationMode": "exact_match"
+  },
+  "nextTrialId": "trial_5b6c7d8e-9f0a-4b2c-3d4e-5f6a7b8c9d0e",
+  "branching": null
+}

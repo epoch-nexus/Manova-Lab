@@ -1,0 +1,104 @@
+{
+  "id": "exp_1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+  "title": "Simple Visual Reaction Time Study",
+  "description": "Measures human baseline motor response latency to visual focal stimuli.",
+  "status": "PUBLISHED",
+  "version": 1,
+  "ownerResearcherId": "res_9a8b7c6d-5e4f-4a3b-2c1d-0e9f8a7b6c5d",
+  "publicSlug": "visual-rt-baseline",
+  "generalInstructions": "In this experiment, you will observe a central fixation cross (+) followed by a stimulus letter. Press the Spacebar as fast as you can once the stimulus appears.",
+  "completionMessage": "Thank you for participating! Your responses have been anonymously recorded.",
+  "config": {
+    "displayMode": "fullscreen",
+    "backgroundColor": "#F8FAFC",
+    "allowPause": false,
+    "showFeedback": true
+  },
+  "trials": [
+    {
+      "id": "trial_4a5b6c7d-8e9f-4a1b-2c3d-4e5f6a7b8c9d",
+      "orderIndex": 1,
+      "label": "Trial 1 - Target X",
+      "instructions": null,
+      "fixation": {
+        "enabled": true,
+        "durationMs": 750,
+        "symbol": "+",
+        "color": "#64748B",
+        "fontSize": "32px"
+      },
+      "stimulus": {
+        "id": "stim_8f9a2b1c-3d4e-4f5a-b6c7-d8e9f01a2b3c",
+        "type": "text",
+        "content": "X",
+        "styling": {
+          "fontSize": "48px",
+          "fontWeight": "bold",
+          "color": "#1E293B",
+          "fontFamily": "Inter, sans-serif"
+        }
+      },
+      "timingConfig": {
+        "preStimulusDelayMs": 750,
+        "stimulusDurationMs": 2000,
+        "responseTimeoutMs": 3000,
+        "allowEarlyResponse": false,
+        "waitForResponse": false
+      },
+      "expectedResponse": {
+        "type": "keypress",
+        "allowedKeys": [
+          "Space"
+        ],
+        "correctResponse": "Space",
+        "evaluationMode": "exact_match"
+      },
+      "nextTrialId": "trial_5b6c7d8e-9f0a-4b2c-3d4e-5f6a7b8c9d0e",
+      "branching": null
+    },
+    {
+      "id": "trial_5b6c7d8e-9f0a-4b2c-3d4e-5f6a7b8c9d0e",
+      "orderIndex": 2,
+      "label": "Trial 2 - Target O",
+      "instructions": null,
+      "fixation": {
+        "enabled": true,
+        "durationMs": 500,
+        "symbol": "+",
+        "color": "#64748B",
+        "fontSize": "32px"
+      },
+      "stimulus": {
+        "id": "stim_9a0b1c2d-3e4f-4a5b-6c7d-8e9f0a1b2c3d",
+        "type": "text",
+        "content": "O",
+        "styling": {
+          "fontSize": "48px",
+          "fontWeight": "bold",
+          "color": "#1E293B",
+          "fontFamily": "Inter, sans-serif"
+        }
+      },
+      "timingConfig": {
+        "preStimulusDelayMs": 500,
+        "stimulusDurationMs": 2000,
+        "responseTimeoutMs": 3000,
+        "allowEarlyResponse": false,
+        "waitForResponse": false
+      },
+      "expectedResponse": {
+        "type": "keypress",
+        "allowedKeys": [
+          "Space"
+        ],
+        "correctResponse": "Space",
+        "evaluationMode": "exact_match"
+      },
+      "nextTrialId": null,
+      "branching": null
+    }
+  ],
+  "createdAt": "2026-09-26T10:00:00.000Z",
+  "updatedAt": "2026-09-26T10:15:00.000Z",
+  "publishedAt": "2026-09-26T10:15:00.000Z"
+}
