@@ -69,9 +69,21 @@ export const errorHandler: ErrorRequestHandler = (
     }
   }
 
-  // 4. Default unhandled server error fallback
+  // 4. CORS Not Allowed Error
+  if (err instanceof Error && err.message === 'Not allowed by CORS') {
+    res.status(403).json({
+      error: {
+        code: 'FORBIDDEN',
+        message: 'Cross-Origin Request Blocked: Origin is not permitted.',
+      },
+    });
+    return;
+  }
+
+  // 5. Default unhandled server error fallback (never expose stack traces)
+  const isProd = process.env.NODE_ENV === 'production';
   const message =
-    err instanceof Error && process.env.NODE_ENV !== 'production'
+    err instanceof Error && !isProd
       ? err.message
       : 'An unexpected internal server error occurred.';
 

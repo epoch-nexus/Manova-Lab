@@ -1,6 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { authService } from '../../domain/auth.service.js';
 import { requireAuth } from '../middleware/auth.js';
+import { authRateLimiter } from '../middleware/rate-limiter.js';
 
 export const authRouter = Router();
 
@@ -10,6 +11,7 @@ export const authRouter = Router();
  */
 authRouter.post(
   '/register',
+  authRateLimiter,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const result = await authService.register(req.body);
@@ -26,6 +28,7 @@ authRouter.post(
  */
 authRouter.post(
   '/login',
+  authRateLimiter,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const result = await authService.login(req.body);

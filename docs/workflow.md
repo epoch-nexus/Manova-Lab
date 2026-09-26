@@ -16,7 +16,8 @@ This document serves as the master tracking file for the Manova Labs backend, co
 | **Phase 6** | **Randomization Engine** | Seeded Fisher-Yates, deterministic PRNG, session trial order persistence | **COMPLETED** | Verified (66 tests passing, migration, live smoke tests, seed reproducibility) |
 | **Phase 7** | **Conditional Branching Engine** | Response-correctness branching, loop protection, snapshot isolation | **COMPLETED** | Verified (80 tests passing, live smoke tests, precedence compatibility) |
 | **Phase 8** | **Researcher Authentication & Authorization** | Researcher accounts, bcrypt hashing, JWT auth, ownership checks, participant anonymity | **COMPLETED** | Verified (115 tests passing, migrations, live smoke tests) |
-| **Phase 9** | **Production Hardening & Deployment** | Rate limiting, advanced security headers, deployment infrastructure | **PLANNED** | Pre-implementation plan required |
+| **Phase 9** | **Integration Hardening & Security Controls** | Rate limiting, security headers (Helmet), production CORS, audit logging, config validation | **COMPLETED** | Verified (129 tests passing, migrations, live smoke tests) |
+| **Phase 10** | **Demo Preparation & Showcase** | Demo script walkthrough, seed studies, final system rehearsal | **PLANNED** | Pre-implementation plan required |
 
 ---
 
@@ -296,12 +297,43 @@ To maintain complete architectural integrity, avoid uncoordinated dependencies, 
 
 ---
 
-## 11. Upcoming Phases Roadmap
+## 11. Phase 9 — Integration Hardening & Security Controls (COMPLETED)
 
-### Phase 9: Production Hardening & Deployment
-* **Goal**: Production-ready deployment infrastructure, rate limiting, and monitoring.
+### Objectives Achieved
+* **Rate Limiting**: Added sliding-window rate limiting (`express-rate-limit`) protecting sensitive authentication endpoints (`/auth/register`, `/auth/login`) with HTTP `429 RATE_LIMIT_EXCEEDED`, while preserving completely unrestricted execution for participant studies.
+* **Security Headers**: Standardized HTTP security headers (`helmet`) including `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy: no-referrer`, and compatible `Content-Security-Policy`.
+* **Production CORS**: Configured environment-aware CORS middleware enforcing strict domain whitelisting via `CORS_ORIGIN` in production (`403 FORBIDDEN` for unlisted origins) while maintaining developer flexibility in non-production.
+* **CSRF Analysis & Decision**: Formally documented that stateless Bearer token authentication inherently protects against CSRF without cookie tokens.
+* **Audit Logging Engine**: Added PostgreSQL `AuditLog` entity with Prisma migration and non-blocking domain logging for registration, login success/failure, experiment creation, updates, deletions, and publications. Explicitly sanitizes and prohibits passwords, hashes, and tokens.
+* **Configuration Validation**: Implemented Zod-based environment validation (`src/config/env.ts`) that fails fast on startup if production mode is configured with weak or default secrets.
+* **Graceful Error Handling**: Ensured internal error messages and stack traces are suppressed in production 500 responses.
+
+### Deliverables & Key Files
+* **Database & Migrations**:
+  * `prisma/schema.prisma`: Added `AuditLog` model.
+  * `prisma/migrations/20260926074854_add_audit_logs/migration.sql`: Clean database migration.
+* **Domain & Middleware Implementation**:
+  * `src/domain/audit.service.ts`: Append-only, sanitized audit logging service.
+  * `src/config/env.ts`: Environment validation and fail-fast production security checks.
+  * `src/server/middleware/cors.ts`: Environment-aware CORS origin validator.
+  * `src/server/middleware/rate-limiter.ts`: Auth rate limiter with standard error payloads.
+  * `src/server/middleware/errorHandler.ts`: Enhanced production error sanitizer and CORS handler.
+* **Testing & Verification**:
+  * `tests/security.test.ts`: 14 comprehensive tests covering security headers, rate limiting, CORS behavior, configuration validation, audit events, and regression boundaries.
+  * Full regression: 9 test suites, 129 tests passing.
+  * `scripts/smoke-test.ts`: 21 live HTTP steps verifying all 9 phases end-to-end.
+  * `docs/phase-9-checklist.md`: Complete Phase 9 technical checklist and audit report.
+* **Git Status**:
+  * Implemented on branch `backend/hardening`.
+
+---
+
+## 12. Upcoming Phases Roadmap
+
+### Phase 10: Demo Preparation & Final Polish
+* **Goal**: End-to-end rehearsal, showcase scripts, and demo datasets for hackathon presentation.
 * **Key Deliverables**:
-  1. Rate limiting on authentication and participant endpoints.
-  2. Advanced security headers (Helmet, strict CORS).
-  3. Containerization (Dockerfile) and deployment configuration.
-  4. Monitoring, health checks, and structured error reporting.
+  1. Automated seeding of standard psychophysical paradigms (Stroop, Visual Search, Task Switching).
+  2. Presentation walkthrough script.
+  3. Live end-to-end demonstration verification.
+

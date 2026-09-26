@@ -20,6 +20,7 @@ async function runSmokeTests() {
     await prisma.session.deleteMany();
     await prisma.experimentVersion.deleteMany();
     await prisma.experiment.deleteMany();
+    await prisma.auditLog.deleteMany();
     await prisma.researcher.deleteMany();
 
     // 1. Healthcheck
@@ -28,6 +29,8 @@ async function runSmokeTests() {
     const healthBody = await healthRes.json();
     console.log('  Status:', healthRes.status, JSON.stringify(healthBody));
     if (healthRes.status !== 200 || healthBody.status !== 'ok') throw new Error('Healthcheck failed');
+    if (healthRes.headers.get('x-content-type-options') !== 'nosniff') throw new Error('Security header nosniff missing');
+    if (healthRes.headers.get('x-frame-options') !== 'SAMEORIGIN') throw new Error('Security header x-frame-options missing');
 
     // 2. Phase 8: Researcher Registration
     console.log('[2/20] Testing POST /api/v1/auth/register (Primary Researcher)');
@@ -651,12 +654,25 @@ async function runSmokeTests() {
       throw new Error(`Session B did not advance to Trial 3: expected ${branchTrial3}, got ${continueBData.nextTrial.id}`);
     }
 
-    console.log('--- ALL 20 LIVE SMOKE TESTS (PHASES 1-8) PASSED CLEANLY! ---');
+    // 21. Phase 9: Audit Trail Live Verification
+    console.log('[21/21] Testing Phase 9: Audit Log Trail Verification');
+    const auditLogs = await prisma.auditLog.findMany();
+    console.log('  Total Audit Events Recorded:', auditLogs.length);
+    if (auditLogs.length === 0) throw new Error('No audit logs recorded during live smoke tests');
+    for (const log of auditLogs) {
+      const meta = log.metadata as any;
+      if (meta?.password || meta?.passwordHash || meta?.token || meta?.jwt) {
+        throw new Error(`Sensitive field leaked in audit log metadata for event ${log.eventType}`);
+      }
+    }
+
+    console.log('--- ALL 21 LIVE SMOKE TESTS (PHASES 1-9) PASSED CLEANLY! ---');
   } finally {
     await prisma.sessionResponse.deleteMany();
     await prisma.session.deleteMany();
     await prisma.experimentVersion.deleteMany();
     await prisma.experiment.deleteMany();
+    await prisma.auditLog.deleteMany();
     await prisma.researcher.deleteMany();
     await prisma.$disconnect();
     server.close();

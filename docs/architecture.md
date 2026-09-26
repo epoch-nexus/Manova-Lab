@@ -57,6 +57,24 @@ To avoid conflation between authored parameters, runtime states, and collected e
 
 ---
 
+#### Entity: AuditLog
+* **Category**: SECURITY & AUDIT
+* **Purpose**: Records immutable historical audit logs for critical researcher actions (registration, login success/failure, experiment lifecycle transitions).
+* **Who Creates It**: Backend services automatically upon researcher action.
+* **Lifecycle Phase**: Written at event occurrence; append-only and immutable.
+* **Relationships**:
+  * Optionally references `researcherId` (nullable to accommodate unauthenticated or failed login attempts).
+* **Required Fields**:
+  * `id` (`string`, UUIDv4): Globally unique identifier.
+  * `eventType` (`string`): Event type descriptor (`RESEARCHER_REGISTERED`, `LOGIN_SUCCESS`, `LOGIN_FAILED`, `EXPERIMENT_CREATED`, `EXPERIMENT_UPDATED`, `EXPERIMENT_PUBLISHED`, `EXPERIMENT_DELETED`).
+  * `createdAt` (`string`, ISO 8601): Event occurrence timestamp.
+* **Optional Fields**:
+  * `researcherId` (`string | null`, UUIDv4): Identifier of the researcher if authenticated.
+  * `resourceId` (`string | null`, UUIDv4): Identifier of the affected experiment if applicable.
+  * `metadata` (`object | null`): Safe contextual JSON data (passwords, hashes, and tokens are strictly prohibited).
+
+---
+
 #### Entity: Experiment
 * **Category**: EXPERIMENT CONFIGURATION
 * **Purpose**: Represents the root study definition, containing global parameters, researcher ownership, metadata, and the sequence of trials.
@@ -698,6 +716,18 @@ The MVP experiment requested for the project slice is completely represented in:
 ### Researcher authentication & ownership authorization (Phase 8)
 * **Decision**: Enforce stateless JSON Web Token (JWT) authentication for all researcher operations and bind all experiment management actions to the authenticated researcher ID (`Experiment.ownerResearcherId`). Anonymous participants access published studies with zero accounts, zero cookies, and zero JWTs.
 * **Reason**: Strict separation of concerns, institutional review board (IRB) ethical standards for human participant privacy, and prevention of cross-researcher data tampering. Returns `401 UNAUTHORIZED` for missing/invalid auth and `403 FORBIDDEN` for attempts to access or modify resources owned by other researchers.
-* **Future extension**: Lab collaboration workspaces, granular organization-level role-based access control (RBAC), and session expiration refresh-token rotation (Phase 9+).
+* **Future extension**: Lab collaboration workspaces, granular organization-level role-based access control (RBAC), and session expiration refresh-token rotation (Phase 10+).
+
+### Integration hardening & security controls (Phase 9)
+* **Decision**: Implement defense-in-depth security controls around the existing API surface:
+  1. **Rate Limiting**: Protect sensitive authentication endpoints against brute-force attacks via sliding window counters.
+  2. **Security Headers**: Enforce standard HTTP headers (`nosniff`, `SAMEORIGIN`, `no-referrer`, CSP) via Helmet.
+  3. **Production CORS**: Enforce strict origin whitelisting in production via `CORS_ORIGIN` while keeping development permissive.
+  4. **CSRF Immunity**: Stateless Bearer token architecture eliminates CSRF risks without needing cookie tokens.
+  5. **Audit Logging**: Persist immutable, sanitized audit records for all researcher account and experiment lifecycle events.
+  6. **Configuration Validation**: Fail-fast on startup in production if weak/default secrets are present.
+* **Reason**: Hardens the backend for production integration while preserving 100% of existing participant execution performance, timing fidelity, and anonymity.
+* **Future extension**: Redis-backed distributed rate limiting, automated audit log archival, and centralized SIEM log shipping.
+
 
 

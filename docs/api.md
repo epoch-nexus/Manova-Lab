@@ -7,7 +7,13 @@ The Manova Labs API is strictly partitioned into two operational surfaces:
 2. **Participant API (`/api/v1/participant`)**: Fully anonymous and public. Requires zero login, zero cookies, and zero participant accounts. All participant requests are authorized solely via an ephemeral `sessionId` issued at session initialization.
 
 > [!IMPORTANT]
-> This separation is an architectural and security boundary (to be strictly enforced in Phase 8 via authentication middleware and CORS policies). It guarantees participant anonymity, GDPR compliance, and adherence to Institutional Review Board (IRB) human-subject research protocols.
+> This separation is an architectural and security boundary enforced via JWT authentication middleware, resource ownership checks, and CORS policies. It guarantees participant anonymity, GDPR compliance, and adherence to Institutional Review Board (IRB) human-subject research protocols.
+> 
+> **Phase 9 Hardening Controls**:
+> - **Security Headers**: Automatic enforcement of `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy: no-referrer`, and `Content-Security-Policy`.
+> - **Production CORS**: Origin whitelist configured via `CORS_ORIGIN`; unauthorized origins receive `403 FORBIDDEN`.
+> - **Rate Limiting**: Protects authentication endpoints (`/auth/register`, `/auth/login`) with HTTP `429 RATE_LIMIT_EXCEEDED`. Participant execution is never throttled.
+> - **CSRF Immunity**: Authentication is stateless Bearer JWT; no session cookies are accepted, inherently eliminating ambient CSRF vulnerabilities.
 
 ---
 
@@ -45,7 +51,8 @@ All error responses from the Manova Labs API adhere to a single, predictable JSO
 | **409 Conflict** | `EXPERIMENT_ALREADY_PUBLISHED` | Researcher attempts to republish or overwrite an already active published snapshot. |
 | **409 Conflict** | `SESSION_ALREADY_COMPLETED` | Participant attempts to submit a response to a session that has already completed. |
 | **422 Unprocessable**| `VALIDATION_ERROR` | Semantic validation failure during publishing (e.g., dangling `nextTrialId` reference). |
-| **500 Server Error** | `INTERNAL_SERVER_ERROR`| Unhandled server-side failure. |
+| **429 Too Many Requests** | `RATE_LIMIT_EXCEEDED` | Exceeded authentication request threshold (default 20 requests per 15 minutes). |
+| **500 Server Error** | `INTERNAL_SERVER_ERROR`| Unhandled server-side failure (stack traces hidden in production). |
 
 ---
 

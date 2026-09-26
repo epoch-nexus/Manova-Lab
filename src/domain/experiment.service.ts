@@ -11,6 +11,7 @@ import type {
   PublishExperimentResponse,
 } from '../types/experiment.d.ts';
 import { Prisma } from '@prisma/client';
+import { auditService } from './audit.service.js';
 
 export class ExperimentService {
   /**
@@ -52,6 +53,13 @@ export class ExperimentService {
         createdAt: true,
         updatedAt: true,
       },
+    });
+
+    await auditService.log({
+      researcherId,
+      eventType: 'EXPERIMENT_CREATED',
+      resourceId: created.id,
+      metadata: { publicSlug: created.publicSlug, title: created.title },
     });
 
     return {
@@ -137,7 +145,7 @@ export class ExperimentService {
     const newVersion = isPublished ? existing.version + 1 : existing.version;
     const newStatus = isPublished ? 'DRAFT' : existing.status;
 
-    return await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       // If trials are being replaced, delete existing and recreate
       if (validated.trials) {
         await tx.trial.deleteMany({ where: { experimentId: id } });
@@ -174,6 +182,15 @@ export class ExperimentService {
         updatedAt: updated.updatedAt.toISOString(),
       };
     });
+
+    await auditService.log({
+      researcherId: existing.ownerResearcherId,
+      eventType: 'EXPERIMENT_UPDATED',
+      resourceId: id,
+      metadata: { version: newVersion },
+    });
+
+    return result;
   }
 
   /**
@@ -190,6 +207,12 @@ export class ExperimentService {
     }
 
     await prisma.experiment.delete({ where: { id } });
+
+    await auditService.log({
+      researcherId: existing.ownerResearcherId,
+      eventType: 'EXPERIMENT_DELETED',
+      resourceId: id,
+    });
   }
 
   /**
@@ -217,7 +240,7 @@ export class ExperimentService {
     const snapshotId = `snap_${fullExperiment.id}_v${fullExperiment.version}`;
     const publishedAt = new Date();
 
-    return await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       // Create immutable snapshot
       await tx.experimentVersion.upsert({
         where: { snapshotId },
@@ -249,9 +272,18 @@ export class ExperimentService {
         version: updated.version,
         publicSlug: updated.publicSlug,
         publishedAt: publishedAt.toISOString(),
-        status: 'PUBLISHED',
+        status: 'PUBLISHED' as const,
       };
     });
+
+    await auditService.log({
+      researcherId: fullExperiment.ownerResearcherId,
+      eventType: 'EXPERIMENT_PUBLISHED',
+      resourceId: id,
+      metadata: { version: fullExperiment.version, publicSlug: fullExperiment.publicSlug },
+    });
+
+    return result;
   }
 
   private mapTrialsToPrismaCreate(trials: any[]): Prisma.TrialCreateWithoutExperimentInput[] {

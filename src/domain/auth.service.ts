@@ -4,9 +4,11 @@ import { prisma } from '../db/prisma.js';
 import { registerSchema, loginSchema } from '../schemas/auth.schema.js';
 import { ConflictError, UnauthorizedError, NotFoundError } from '../server/errors.js';
 import type { ResearcherProfile, AuthResponse } from '../types/experiment.d.ts';
+import { auditService } from './audit.service.js';
+import { config } from '../config/env.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'manova-labs-jwt-default-dev-secret-key-32chars';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+const JWT_SECRET = config.JWT_SECRET;
+const JWT_EXPIRES_IN = config.JWT_EXPIRES_IN;
 
 export class AuthService {
   /**
@@ -34,6 +36,12 @@ export class AuthService {
       },
     });
 
+    await auditService.log({
+      researcherId: researcher.id,
+      eventType: 'RESEARCHER_REGISTERED',
+      metadata: { email: researcher.email },
+    });
+
     const token = this.generateToken(researcher.id, researcher.email);
 
     return {
@@ -53,13 +61,28 @@ export class AuthService {
     });
 
     if (!researcher) {
+      await auditService.log({
+        eventType: 'LOGIN_FAILED',
+        metadata: { email: validated.email },
+      });
       throw new UnauthorizedError('Invalid email or password');
     }
 
     const isMatch = await bcrypt.compare(validated.password, researcher.passwordHash);
     if (!isMatch) {
+      await auditService.log({
+        researcherId: researcher.id,
+        eventType: 'LOGIN_FAILED',
+        metadata: { email: validated.email },
+      });
       throw new UnauthorizedError('Invalid email or password');
     }
+
+    await auditService.log({
+      researcherId: researcher.id,
+      eventType: 'LOGIN_SUCCESS',
+      metadata: { email: researcher.email },
+    });
 
     const token = this.generateToken(researcher.id, researcher.email);
 

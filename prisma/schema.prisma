@@ -174,3 +174,18 @@ model SessionResponse {
   @@index([submittedAt])
   @@map("session_responses")
 }
+
+model AuditLog {
+  id           String    @id @default(uuid())
+  researcherId String?
+  eventType    String    // e.g. 'RESEARCHER_REGISTERED', 'LOGIN_SUCCESS', 'LOGIN_FAILED', 'EXPERIMENT_CREATED', 'EXPERIMENT_UPDATED', 'EXPERIMENT_DELETED', 'EXPERIMENT_PUBLISHED'
+  resourceId   String?   // e.g. experimentId
+  metadata     Json?     // safe contextual information (no passwords, hashes, or tokens)
+  createdAt    DateTime  @default(now())
+
+  @@index([researcherId])
+  @@index([eventType])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
