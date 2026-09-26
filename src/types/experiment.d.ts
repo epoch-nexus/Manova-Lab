@@ -249,9 +249,29 @@ export type ApiErrorCode =
   | 'INVALID_RESPONSE'
   | 'TRIAL_NOT_FOUND'
   | 'UNAUTHORIZED'
+  | 'FORBIDDEN'
   | 'VALIDATION_ERROR'
   | 'EXECUTION_LIMIT_EXCEEDED'
   | 'INTERNAL_SERVER_ERROR';
+
+export interface AuthenticatedResearcher {
+  id: string;
+  email: string;
+  name?: string | null;
+}
+
+export interface ResearcherProfile {
+  id: string;
+  email: string;
+  name?: string | null;
+  createdAt: ISO8601Timestamp;
+  updatedAt: ISO8601Timestamp;
+}
+
+export interface AuthResponse {
+  researcher: ResearcherProfile;
+  token: string;
+}
 
 export interface ApiErrorDetail {
   field?: string;

@@ -39,6 +39,24 @@ To avoid conflation between authored parameters, runtime states, and collected e
 
 ### 2.1 Entity Specifications
 
+#### Entity: Researcher
+* **Category**: USER & AUTHENTICATION
+* **Purpose**: Represents an authenticated researcher account that designs, creates, owns, publishes, and reviews experimental studies and empirical results.
+* **Who Creates It**: Self-service via registration (`POST /api/v1/auth/register`).
+* **Lifecycle Phase**: Account creation, active usage, authentication via JWT.
+* **Relationships**:
+  * Owns zero or more `Experiment` entities (1-to-many composition with cascade delete).
+* **Required Fields**:
+  * `id` (`string`, UUIDv4): Globally unique identifier.
+  * `email` (`string`): Unique lowercase email address.
+  * `passwordHash` (`string`): Salted bcrypt password hash (never returned via API or token).
+  * `createdAt` (`string`, ISO 8601): Account creation timestamp.
+  * `updatedAt` (`string`, ISO 8601): Profile update timestamp.
+* **Optional Fields**:
+  * `name` (`string | null`): Display name of the researcher.
+
+---
+
 #### Entity: Experiment
 * **Category**: EXPERIMENT CONFIGURATION
 * **Purpose**: Represents the root study definition, containing global parameters, researcher ownership, metadata, and the sequence of trials.
@@ -676,3 +694,10 @@ The MVP experiment requested for the project slice is completely represented in:
 * **Decision**: Standardize on a uniform JSON error payload: `{ "error": { "code": string, "message": string, "details"?: array } }`.
 * **Reason**: Simplifies frontend error handling and provides machine-readable error codes.
 * **Future extension**: Localized error messages and error tracing IDs correlated with server logs.
+
+### Researcher authentication & ownership authorization (Phase 8)
+* **Decision**: Enforce stateless JSON Web Token (JWT) authentication for all researcher operations and bind all experiment management actions to the authenticated researcher ID (`Experiment.ownerResearcherId`). Anonymous participants access published studies with zero accounts, zero cookies, and zero JWTs.
+* **Reason**: Strict separation of concerns, institutional review board (IRB) ethical standards for human participant privacy, and prevention of cross-researcher data tampering. Returns `401 UNAUTHORIZED` for missing/invalid auth and `403 FORBIDDEN` for attempts to access or modify resources owned by other researchers.
+* **Future extension**: Lab collaboration workspaces, granular organization-level role-based access control (RBAC), and session expiration refresh-token rotation (Phase 9+).
+
+

@@ -1,5 +1,5 @@
 import { prisma } from '../db/prisma.js';
-import { NotFoundError } from '../server/errors.js';
+import { NotFoundError, ForbiddenError } from '../server/errors.js';
 import type { ResultsQuery, ResultsSummaryQuery } from '../schemas/results.schema.js';
 import type { Prisma } from '@prisma/client';
 
@@ -71,7 +71,8 @@ export class ResultsService {
    */
   async getRawResults(
     experimentId: string,
-    query?: ResultsQuery
+    query?: ResultsQuery,
+    researcherId?: string
   ): Promise<ResultsListResponse> {
     // 1. Verify experiment exists
     const experiment = await prisma.experiment.findUnique({
@@ -83,6 +84,10 @@ export class ResultsService {
         `Experiment '${experimentId}' not found`,
         'EXPERIMENT_NOT_FOUND'
       );
+    }
+
+    if (researcherId && experiment.ownerResearcherId !== researcherId) {
+      throw new ForbiddenError('You do not own this experiment');
     }
 
     // 2. Build where filter
@@ -161,7 +166,8 @@ export class ResultsService {
    */
   async getSummary(
     experimentId: string,
-    query?: ResultsSummaryQuery
+    query?: ResultsSummaryQuery,
+    researcherId?: string
   ): Promise<ResultsSummaryResponse> {
     const experiment = await prisma.experiment.findUnique({
       where: { id: experimentId },
@@ -172,6 +178,10 @@ export class ResultsService {
         `Experiment '${experimentId}' not found`,
         'EXPERIMENT_NOT_FOUND'
       );
+    }
+
+    if (researcherId && experiment.ownerResearcherId !== researcherId) {
+      throw new ForbiddenError('You do not own this experiment');
     }
 
     // 1. Session counts
@@ -300,7 +310,8 @@ export class ResultsService {
    */
   async exportJson(
     experimentId: string,
-    query?: ResultsQuery
+    query?: ResultsQuery,
+    researcherId?: string
   ): Promise<JsonExportResponse> {
     const experiment = await prisma.experiment.findUnique({
       where: { id: experimentId },
@@ -313,7 +324,11 @@ export class ResultsService {
       );
     }
 
-    const raw = await this.getRawResults(experimentId, query);
+    if (researcherId && experiment.ownerResearcherId !== researcherId) {
+      throw new ForbiddenError('You do not own this experiment');
+    }
+
+    const raw = await this.getRawResults(experimentId, query, researcherId);
 
     return {
       experimentId: experiment.id,
@@ -330,9 +345,10 @@ export class ResultsService {
    */
   async exportCsv(
     experimentId: string,
-    query?: ResultsQuery
+    query?: ResultsQuery,
+    researcherId?: string
   ): Promise<string> {
-    const raw = await this.getRawResults(experimentId, query);
+    const raw = await this.getRawResults(experimentId, query, researcherId);
 
     const headers = [
       'sessionId',

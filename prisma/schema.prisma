@@ -28,13 +28,27 @@ enum ExecutionState {
   COMPLETE
 }
 
+model Researcher {
+  id           String       @id @default(uuid())
+  email        String       @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  experiments  Experiment[]
+
+  @@map("researchers")
+}
+
 model Experiment {
   id                  String              @id @default(uuid())
   title               String
   description         String
   status              ExperimentStatus    @default(DRAFT)
   version             Int                 @default(1)
-  ownerResearcherId   String              @default("res_anonymous_researcher")
+  ownerResearcherId   String
+  researcher          Researcher?         @relation(fields: [ownerResearcherId], references: [id], onDelete: Cascade)
   publicSlug          String              @unique
   generalInstructions String?
   completionMessage   String?

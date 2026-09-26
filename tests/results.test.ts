@@ -2,10 +2,12 @@ import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import request from 'supertest';
 import { createApp } from '../src/server/app.js';
 import { prisma } from '../src/db/prisma.js';
+import { createTestResearcher } from './helpers/auth.js';
 import type { Application } from 'express';
 
 describe('Phase 5 Results Aggregation, Analytics & Data Export', () => {
   let app: Application;
+  let authHeader: { Authorization: string };
   let experimentIdA: string;
   let experimentIdB: string;
   let trial1IdA: string;
@@ -20,8 +22,14 @@ describe('Phase 5 Results Aggregation, Analytics & Data Export', () => {
     await prisma.sessionResponse.deleteMany();
     await prisma.session.deleteMany();
     await prisma.experimentVersion.deleteMany();
+    await prisma.expectedResponse.deleteMany();
+    await prisma.stimulus.deleteMany();
     await prisma.trial.deleteMany();
     await prisma.experiment.deleteMany();
+    await prisma.researcher.deleteMany();
+
+    const researcher = await createTestResearcher(app, 'results-suite@test.com');
+    authHeader = researcher.authHeader;
 
     // 1. Create Experiment A with 2 trials
     trial1IdA = '11111111-1111-4111-8111-111111111111';
@@ -29,6 +37,7 @@ describe('Phase 5 Results Aggregation, Analytics & Data Export', () => {
 
     const expARes = await request(app)
       .post('/api/v1/experiments')
+      .set(authHeader)
       .send({
         title: 'Results Test Experiment A',
         description: 'Testing results aggregation',
@@ -58,6 +67,7 @@ describe('Phase 5 Results Aggregation, Analytics & Data Export', () => {
               evaluationMode: 'exact_match',
             },
             nextTrialId: trial2IdA,
+            branching: null,
           },
           {
             id: trial2IdA,
@@ -77,6 +87,7 @@ describe('Phase 5 Results Aggregation, Analytics & Data Export', () => {
               evaluationMode: 'exact_match',
             },
             nextTrialId: null,
+            branching: null,
           },
         ],
       });
@@ -84,11 +95,14 @@ describe('Phase 5 Results Aggregation, Analytics & Data Export', () => {
     experimentIdA = expARes.body.id;
 
     // Publish Experiment A
-    await request(app).post(`/api/v1/experiments/${experimentIdA}/publish`);
+    await request(app)
+      .post(`/api/v1/experiments/${experimentIdA}/publish`)
+      .set(authHeader);
 
     // 2. Create Experiment B (for isolation tests)
     const expBRes = await request(app)
       .post('/api/v1/experiments')
+      .set(authHeader)
       .send({
         title: 'Results Test Experiment B',
         description: 'Testing isolation',
@@ -118,12 +132,15 @@ describe('Phase 5 Results Aggregation, Analytics & Data Export', () => {
               evaluationMode: 'exact_match',
             },
             nextTrialId: null,
+            branching: null,
           },
         ],
       });
 
     experimentIdB = expBRes.body.id;
-    await request(app).post(`/api/v1/experiments/${experimentIdB}/publish`);
+    await request(app)
+      .post(`/api/v1/experiments/${experimentIdB}/publish`)
+      .set(authHeader);
   });
 
   afterAll(async () => {
@@ -134,13 +151,17 @@ describe('Phase 5 Results Aggregation, Analytics & Data Export', () => {
   // 1. Empty Results Handling
   // ========================================================
   it('should return empty results and clean null statistics for experiment with no responses', async () => {
-    const rawRes = await request(app).get(`/api/v1/experiments/${experimentIdB}/results`);
+    const rawRes = await request(app)
+      .get(`/api/v1/experiments/${experimentIdB}/results`)
+      .set(authHeader);
     expect(rawRes.status).toBe(200);
     expect(rawRes.body.experimentId).toBe(experimentIdB);
     expect(rawRes.body.total).toBe(0);
     expect(rawRes.body.results).toEqual([]);
 
-    const summaryRes = await request(app).get(`/api/v1/experiments/${experimentIdB}/results/summary`);
+    const summaryRes = await request(app)
+      .get(`/api/v1/experiments/${experimentIdB}/results/summary`)
+      .set(authHeader);
     expect(summaryRes.status).toBe(200);
     expect(summaryRes.body.experimentId).toBe(experimentIdB);
     expect(summaryRes.body.totalSessions).toBe(0);
@@ -249,31 +270,33 @@ describe('Phase 5 Results Aggregation, Analytics & Data Export', () => {
   // ========================================================
   it('should retrieve raw results and support filtering by session, trial, and timeout status', async () => {
     // All results for Experiment A (4 total)
-    const allRes = await request(app).get(`/api/v1/experiments/${experimentIdA}/results`);
+    const allRes = await request(app)
+      .get(`/api/v1/experiments/${experimentIdA}/results`)
+      .set(authHeader);
     expect(allRes.status).toBe(200);
     expect(allRes.body.total).toBe(4);
     expect(allRes.body.results).toHaveLength(4);
 
     // Filter by sessionId
-    const s1Only = await request(app).get(
-      `/api/v1/experiments/${experimentIdA}/results?sessionId=${session1Id}`
-    );
+    const s1Only = await request(app)
+      .get(`/api/v1/experiments/${experimentIdA}/results?sessionId=${session1Id}`)
+      .set(authHeader);
     expect(s1Only.status).toBe(200);
     expect(s1Only.body.total).toBe(2);
     expect(s1Only.body.results.every((r: any) => r.sessionId === session1Id)).toBe(true);
 
     // Filter by trialId
-    const t1Only = await request(app).get(
-      `/api/v1/experiments/${experimentIdA}/results?trialId=${trial1IdA}`
-    );
+    const t1Only = await request(app)
+      .get(`/api/v1/experiments/${experimentIdA}/results?trialId=${trial1IdA}`)
+      .set(authHeader);
     expect(t1Only.status).toBe(200);
     expect(t1Only.body.total).toBe(2);
     expect(t1Only.body.results.every((r: any) => r.trialId === trial1IdA)).toBe(true);
 
     // Filter by timedOut=true
-    const timeoutOnly = await request(app).get(
-      `/api/v1/experiments/${experimentIdA}/results?timedOut=true`
-    );
+    const timeoutOnly = await request(app)
+      .get(`/api/v1/experiments/${experimentIdA}/results?timedOut=true`)
+      .set(authHeader);
     expect(timeoutOnly.status).toBe(200);
     expect(timeoutOnly.body.total).toBe(1);
     expect(timeoutOnly.body.results[0].timedOut).toBe(true);
@@ -284,9 +307,9 @@ describe('Phase 5 Results Aggregation, Analytics & Data Export', () => {
   // 4. Statistical Summary Aggregation
   // ========================================================
   it('should compute exact statistical aggregations at experiment-level', async () => {
-    const summaryRes = await request(app).get(
-      `/api/v1/experiments/${experimentIdA}/results/summary`
-    );
+    const summaryRes = await request(app)
+      .get(`/api/v1/experiments/${experimentIdA}/results/summary`)
+      .set(authHeader);
     expect(summaryRes.status).toBe(200);
     const s = summaryRes.body;
 
@@ -318,9 +341,9 @@ describe('Phase 5 Results Aggregation, Analytics & Data Export', () => {
   // 5. Trial-Level Summary Aggregation
   // ========================================================
   it('should compute trial-level summary when ?trialId=... is supplied', async () => {
-    const trialSummaryRes = await request(app).get(
-      `/api/v1/experiments/${experimentIdA}/results/summary?trialId=${trial1IdA}`
-    );
+    const trialSummaryRes = await request(app)
+      .get(`/api/v1/experiments/${experimentIdA}/results/summary?trialId=${trial1IdA}`)
+      .set(authHeader);
     expect(trialSummaryRes.status).toBe(200);
     const s = trialSummaryRes.body;
 
@@ -341,9 +364,9 @@ describe('Phase 5 Results Aggregation, Analytics & Data Export', () => {
   // 6. JSON Export
   // ========================================================
   it('should export complete structured JSON with proper attachment headers', async () => {
-    const exportRes = await request(app).get(
-      `/api/v1/experiments/${experimentIdA}/results/export.json`
-    );
+    const exportRes = await request(app)
+      .get(`/api/v1/experiments/${experimentIdA}/results/export.json`)
+      .set(authHeader);
     expect(exportRes.status).toBe(200);
     expect(exportRes.headers['content-type']).toContain('application/json');
     expect(exportRes.headers['content-disposition']).toContain(
@@ -359,9 +382,9 @@ describe('Phase 5 Results Aggregation, Analytics & Data Export', () => {
   // 7. CSV Export
   // ========================================================
   it('should export valid RFC 4180 CSV without participantId and with proper escaping', async () => {
-    const csvRes = await request(app).get(
-      `/api/v1/experiments/${experimentIdA}/results/export.csv`
-    );
+    const csvRes = await request(app)
+      .get(`/api/v1/experiments/${experimentIdA}/results/export.csv`)
+      .set(authHeader);
     expect(csvRes.status).toBe(200);
     expect(csvRes.headers['content-type']).toContain('text/csv');
     expect(csvRes.headers['content-disposition']).toContain(
@@ -398,16 +421,18 @@ describe('Phase 5 Results Aggregation, Analytics & Data Export', () => {
   // 8. Experiment Isolation & Error Cases
   // ========================================================
   it('should isolate results between different experiments', async () => {
-    const expBRes = await request(app).get(`/api/v1/experiments/${experimentIdB}/results`);
+    const expBRes = await request(app)
+      .get(`/api/v1/experiments/${experimentIdB}/results`)
+      .set(authHeader);
     expect(expBRes.status).toBe(200);
     expect(expBRes.body.total).toBe(0);
     expect(expBRes.body.results).toEqual([]);
   });
 
   it('should return 404 EXPERIMENT_NOT_FOUND when querying results for non-existent experiment', async () => {
-    const res = await request(app).get(
-      '/api/v1/experiments/00000000-0000-0000-0000-000000000000/results'
-    );
+    const res = await request(app)
+      .get('/api/v1/experiments/00000000-0000-0000-0000-000000000000/results')
+      .set(authHeader);
     expect(res.status).toBe(404);
     expect(res.body.error.code).toBe('EXPERIMENT_NOT_FOUND');
   });

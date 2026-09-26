@@ -43,3 +43,15 @@ export class ConflictError extends AppError {
     super(409, code, message, details);
   }
 }
+
+export class UnauthorizedError extends AppError {
+  constructor(message = 'Authentication required', code: ApiErrorCode = 'UNAUTHORIZED', details?: ApiErrorDetail[]) {
+    super(401, code, message, details);
+  }
+}
+
+export class ForbiddenError extends AppError {
+  constructor(message = 'Access forbidden: you do not have permission to access this resource', code: ApiErrorCode = 'FORBIDDEN', details?: ApiErrorDetail[]) {
+    super(403, code, message, details);
+  }
+}

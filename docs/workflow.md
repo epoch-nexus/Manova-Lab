@@ -15,7 +15,8 @@ This document serves as the master tracking file for the Manova Labs backend, co
 | **Phase 5** | **Results Aggregation & Analytics** | Researcher results queries, CSV/JSON export, latency summaries | **COMPLETED** | Verified (51 tests passing, live smoke tests, JSON/CSV exports) |
 | **Phase 6** | **Randomization Engine** | Seeded Fisher-Yates, deterministic PRNG, session trial order persistence | **COMPLETED** | Verified (66 tests passing, migration, live smoke tests, seed reproducibility) |
 | **Phase 7** | **Conditional Branching Engine** | Response-correctness branching, loop protection, snapshot isolation | **COMPLETED** | Verified (80 tests passing, live smoke tests, precedence compatibility) |
-| **Phase 8** | **Authentication & Production Hardening** | JWT/Auth, IRB compliance, rate limiting, deployment | **PLANNED** | Pre-implementation plan required |
+| **Phase 8** | **Researcher Authentication & Authorization** | Researcher accounts, bcrypt hashing, JWT auth, ownership checks, participant anonymity | **COMPLETED** | Verified (115 tests passing, migrations, live smoke tests) |
+| **Phase 9** | **Production Hardening & Deployment** | Rate limiting, advanced security headers, deployment infrastructure | **PLANNED** | Pre-implementation plan required |
 
 ---
 
@@ -261,11 +262,46 @@ To maintain complete architectural integrity, avoid uncoordinated dependencies, 
 
 ---
 
-## 10. Upcoming Phases Roadmap
+## 10. Phase 8 — Researcher Authentication & Authorization (COMPLETED)
 
-### Phase 8: Authentication & Production Hardening
-* **Goal**: Production-ready security, researcher accounts, and IRB/GDPR compliance.
+### Objectives Achieved
+* **Researcher Account Model**: Added PostgreSQL `Researcher` entity managed via Prisma, with UUID primary key, unique lowercase email, salted bcrypt password hash, and optional display name.
+* **Foreign Key Relationship**: Linked `Experiment.ownerResearcherId` directly to `Researcher.id` with cascade deletion, guaranteeing strong referential integrity.
+* **Stateless JWT Authentication**: Implemented standard signed JWT generation (`HS256`, 24h expiration) containing minimal identifiers (`researcherId`, `email`) and zero sensitive secrets or hashes.
+* **Authentication Middleware**: Created reusable `requireAuth` middleware for Express that parses `Authorization: Bearer <token>`, validates signature and expiration, and extracts authenticated researcher context into `req.researcher`.
+* **Resource Ownership & Access Control**:
+  * Unauthenticated requests to researcher endpoints return `401 UNAUTHORIZED`.
+  * Authenticated requests targeting another researcher's experiments or results return `403 FORBIDDEN`.
+  * `GET /api/v1/experiments` is strictly scoped to the calling researcher's studies.
+* **Participant Anonymity Preservation**: Participant execution endpoints remain 100% public and anonymous, requiring zero tokens, zero accounts, and never exposing researcher or participant identities.
+
+### Deliverables & Key Files
+* **Database & Migrations**:
+  * `prisma/schema.prisma`: Added `Researcher` model and foreign key relation on `Experiment`.
+  * `prisma/migrations/20260926072139_add_researcher_auth/migration.sql`: Clean database migration.
+* **Domain & Route Implementation**:
+  * `src/domain/auth.service.ts`: Registration, login, password verification, token generation, and profile retrieval.
+  * `src/server/middleware/auth.ts`: Reusable `requireAuth` middleware.
+  * `src/server/routes/auth.routes.ts`: `POST /register`, `POST /login`, `GET /me`.
+  * `src/domain/experiment.service.ts`: Ownership enforcement across all CRUD and publishing methods.
+  * `src/domain/results.service.ts`: Ownership enforcement across raw queries, summaries, and exports.
+  * `src/server/errors.ts`: Added `UnauthorizedError` (401) and `ForbiddenError` (403).
+* **Testing & Verification**:
+  * `tests/auth.test.ts`: 35 tests covering all registration, login, JWT validation, 401 vs 403, and participant anonymity scenarios.
+  * Full regression: 8 test suites, 115 tests passing.
+  * `scripts/smoke-test.ts`: 20 live HTTP steps covering end-to-end functionality across all 8 phases.
+  * `docs/phase-8-checklist.md`: Complete Phase 8 technical documentation and verification audit.
+* **Git Status**:
+  * Implemented on branch `backend/auth`.
+
+---
+
+## 11. Upcoming Phases Roadmap
+
+### Phase 9: Production Hardening & Deployment
+* **Goal**: Production-ready deployment infrastructure, rate limiting, and monitoring.
 * **Key Deliverables**:
-  1. JWT-based researcher authentication and RBAC.
-  2. Rate limiting, CORS policies, and participant anonymity audits.
+  1. Rate limiting on authentication and participant endpoints.
+  2. Advanced security headers (Helmet, strict CORS).
   3. Containerization (Dockerfile) and deployment configuration.
+  4. Monitoring, health checks, and structured error reporting.

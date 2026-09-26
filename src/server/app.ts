@@ -3,6 +3,7 @@ import cors from 'cors';
 import { experimentRouter } from './routes/experiment.routes.js';
 import { participantRouter } from './routes/participant.routes.js';
 import { resultsRouter } from './routes/results.routes.js';
+import { authRouter } from './routes/auth.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 export function createApp(): Application {
@@ -31,6 +32,10 @@ export function createApp(): Application {
   app.get('/timing-poc', (_req: Request, res: Response) => {
     res.sendFile('timing-poc.html', { root: 'public' });
   });
+
+  // Mount Researcher Auth Router
+  app.use('/api/v1/auth', authRouter);
+  app.use('/auth', authRouter);
 
   // Mount Researcher Experiments Router (both versioned and direct root paths)
   app.use('/api/v1/experiments', experimentRouter);

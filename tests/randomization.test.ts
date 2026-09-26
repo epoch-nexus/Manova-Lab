@@ -1,28 +1,41 @@
 import request from 'supertest';
 import { createApp } from '../src/server/app.js';
 import { prisma } from '../src/db/prisma.js';
+import { createTestResearcher } from './helpers/auth.js';
 import {
   seededFisherYatesShuffle,
   createSeededPrng,
   generateRandomizationSeed,
-  hashSeed,
 } from '../src/randomization/index.js';
 
 const app = createApp();
 
 describe('Phase 6 — Stimulus & Trial Randomization Engine', () => {
+  let authHeader: { Authorization: string };
+
   beforeEach(async () => {
     await prisma.sessionResponse.deleteMany();
     await prisma.session.deleteMany();
     await prisma.experimentVersion.deleteMany();
+    await prisma.expectedResponse.deleteMany();
+    await prisma.stimulus.deleteMany();
+    await prisma.trial.deleteMany();
     await prisma.experiment.deleteMany();
+    await prisma.researcher.deleteMany();
+
+    const researcher = await createTestResearcher(app, 'randomization-suite@test.com');
+    authHeader = researcher.authHeader;
   });
 
   afterAll(async () => {
     await prisma.sessionResponse.deleteMany();
     await prisma.session.deleteMany();
     await prisma.experimentVersion.deleteMany();
+    await prisma.expectedResponse.deleteMany();
+    await prisma.stimulus.deleteMany();
+    await prisma.trial.deleteMany();
     await prisma.experiment.deleteMany();
+    await prisma.researcher.deleteMany();
     await prisma.$disconnect();
   });
 
@@ -252,11 +265,13 @@ describe('Phase 6 — Stimulus & Trial Randomization Engine', () => {
       // Create and publish experiment with randomization disabled
       const expRes = await request(app)
         .post('/api/v1/experiments')
+        .set(authHeader)
         .send(createMultiTrialExperiment('linear-study', false));
       expect(expRes.status).toBe(201);
 
       await request(app)
         .post(`/api/v1/experiments/${expRes.body.id}/publish`)
+        .set(authHeader)
         .send();
 
       // Start participant session
@@ -269,7 +284,7 @@ describe('Phase 6 — Stimulus & Trial Randomization Engine', () => {
       const sessionRecord = await prisma.session.findUnique({
         where: { id: sessionRes.body.sessionId },
       });
-      expect(sessionRecord).not.null;
+      expect(sessionRecord).not.toBeNull();
       expect(sessionRecord!.randomizationEnabled).toBe(false);
       expect(sessionRecord!.randomizationSeed).toBeNull();
       expect(sessionRecord!.trialOrder).toEqual([
@@ -288,11 +303,13 @@ describe('Phase 6 — Stimulus & Trial Randomization Engine', () => {
       // Create and publish randomized experiment
       const expRes = await request(app)
         .post('/api/v1/experiments')
+        .set(authHeader)
         .send(createMultiTrialExperiment('randomized-study', true));
       expect(expRes.status).toBe(201);
 
       await request(app)
         .post(`/api/v1/experiments/${expRes.body.id}/publish`)
+        .set(authHeader)
         .send();
 
       // Start session
@@ -304,7 +321,7 @@ describe('Phase 6 — Stimulus & Trial Randomization Engine', () => {
       const sessionRecord = await prisma.session.findUnique({
         where: { id: sessionRes.body.sessionId },
       });
-      expect(sessionRecord).not.null;
+      expect(sessionRecord).not.toBeNull();
       expect(sessionRecord!.randomizationEnabled).toBe(true);
       expect(typeof sessionRecord!.randomizationSeed).toBe('string');
       expect(sessionRecord!.randomizationSeed).toHaveLength(32);
@@ -339,9 +356,11 @@ describe('Phase 6 — Stimulus & Trial Randomization Engine', () => {
     it('12. Execution engine traverses trials according to session-specific trialOrder', async () => {
       const expRes = await request(app)
         .post('/api/v1/experiments')
+        .set(authHeader)
         .send(createMultiTrialExperiment('exec-random-study', true));
       await request(app)
         .post(`/api/v1/experiments/${expRes.body.id}/publish`)
+        .set(authHeader)
         .send();
 
       const sessionRes = await request(app)
@@ -400,7 +419,7 @@ describe('Phase 6 — Stimulus & Trial Randomization Engine', () => {
       // Verify session is marked completed in DB
       const finalSession = await prisma.session.findUnique({ where: { id: sessionId } });
       expect(finalSession!.status).toBe('COMPLETED');
-      expect(finalSession!.completedAt).not.null;
+      expect(finalSession!.completedAt).not.toBeNull();
 
       // Verify all responses were recorded with correct trial IDs in execution order
       const responses = await prisma.sessionResponse.findMany({
@@ -414,9 +433,11 @@ describe('Phase 6 — Stimulus & Trial Randomization Engine', () => {
     it('13. Out-of-order submission fails with 400 when trial does not match active trial in trialOrder', async () => {
       const expRes = await request(app)
         .post('/api/v1/experiments')
+        .set(authHeader)
         .send(createMultiTrialExperiment('order-safety-study', true));
       await request(app)
         .post(`/api/v1/experiments/${expRes.body.id}/publish`)
+        .set(authHeader)
         .send();
 
       const sessionRes = await request(app)
@@ -439,9 +460,11 @@ describe('Phase 6 — Stimulus & Trial Randomization Engine', () => {
     it('14. Two independently created sessions receive independently generated seeds', async () => {
       const expRes = await request(app)
         .post('/api/v1/experiments')
+        .set(authHeader)
         .send(createMultiTrialExperiment('two-sessions-study', true));
       await request(app)
         .post(`/api/v1/experiments/${expRes.body.id}/publish`)
+        .set(authHeader)
         .send();
 
       const s1 = await request(app)
@@ -468,11 +491,13 @@ describe('Phase 6 — Stimulus & Trial Randomization Engine', () => {
       // 1. Create and publish Version 1
       const expRes = await request(app)
         .post('/api/v1/experiments')
+        .set(authHeader)
         .send(createMultiTrialExperiment('isolation-study', true));
       const expId = expRes.body.id;
 
       await request(app)
         .post(`/api/v1/experiments/${expId}/publish`)
+        .set(authHeader)
         .send();
 
       // 2. Start Session 1 on Version 1
@@ -487,6 +512,7 @@ describe('Phase 6 — Stimulus & Trial Randomization Engine', () => {
       // 3. Republish experiment as Version 2 (draft modification)
       await request(app)
         .put(`/api/v1/experiments/${expId}`)
+        .set(authHeader)
         .send({
           title: 'Modified Version 2 Study',
           description: 'Updated description for v2',
@@ -494,6 +520,7 @@ describe('Phase 6 — Stimulus & Trial Randomization Engine', () => {
 
       await request(app)
         .post(`/api/v1/experiments/${expId}/publish`)
+        .set(authHeader)
         .send();
 
       // 4. Verify Session 1 is still locked to v1 snapshot and retains its original randomized order and seed

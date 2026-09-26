@@ -4,9 +4,13 @@ import {
   resultsQuerySchema,
   resultsSummaryQuerySchema,
 } from '../../schemas/results.schema.js';
+import { requireAuth } from '../middleware/auth.js';
 
 export const resultsRouter = Router({ mergeParams: true });
 const resultsService = new ResultsService();
+
+// Researcher results endpoints require authentication
+resultsRouter.use(requireAuth);
 
 /**
  * GET /api/v1/experiments/:experimentId/results
@@ -19,8 +23,9 @@ resultsRouter.get(
       const experimentId = Array.isArray(req.params.experimentId)
         ? req.params.experimentId[0]!
         : req.params.experimentId!;
+      const researcherId = req.researcher!.id;
       const query = resultsQuerySchema.parse(req.query);
-      const data = await resultsService.getRawResults(experimentId, query);
+      const data = await resultsService.getRawResults(experimentId, query, researcherId);
       res.status(200).json(data);
     } catch (err) {
       next(err);
@@ -39,8 +44,9 @@ resultsRouter.get(
       const experimentId = Array.isArray(req.params.experimentId)
         ? req.params.experimentId[0]!
         : req.params.experimentId!;
+      const researcherId = req.researcher!.id;
       const query = resultsSummaryQuerySchema.parse(req.query);
-      const summary = await resultsService.getSummary(experimentId, query);
+      const summary = await resultsService.getSummary(experimentId, query, researcherId);
       res.status(200).json(summary);
     } catch (err) {
       next(err);
@@ -59,8 +65,9 @@ resultsRouter.get(
       const experimentId = Array.isArray(req.params.experimentId)
         ? req.params.experimentId[0]!
         : req.params.experimentId!;
+      const researcherId = req.researcher!.id;
       const query = resultsQuerySchema.parse(req.query);
-      const exportData = await resultsService.exportJson(experimentId, query);
+      const exportData = await resultsService.exportJson(experimentId, query, researcherId);
 
       res.setHeader('Content-Type', 'application/json');
       res.setHeader(
@@ -85,8 +92,9 @@ resultsRouter.get(
       const experimentId = Array.isArray(req.params.experimentId)
         ? req.params.experimentId[0]!
         : req.params.experimentId!;
+      const researcherId = req.researcher!.id;
       const query = resultsQuerySchema.parse(req.query);
-      const csvData = await resultsService.exportCsv(experimentId, query);
+      const csvData = await resultsService.exportCsv(experimentId, query, researcherId);
 
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader(

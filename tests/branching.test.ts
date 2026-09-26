@@ -1,24 +1,38 @@
 import request from 'supertest';
 import { createApp } from '../src/server/app.js';
 import { prisma } from '../src/db/prisma.js';
+import { createTestResearcher } from './helpers/auth.js';
 import { ExecutionEngine } from '../src/engine/execution-engine.js';
 import type { Experiment, Trial } from '../src/types/experiment.d.ts';
 
 const app = createApp();
 
 describe('Phase 7 — Dynamic Conditional Branching Engine', () => {
+  let authHeader: { Authorization: string };
+
   beforeEach(async () => {
     await prisma.sessionResponse.deleteMany();
     await prisma.session.deleteMany();
     await prisma.experimentVersion.deleteMany();
+    await prisma.expectedResponse.deleteMany();
+    await prisma.stimulus.deleteMany();
+    await prisma.trial.deleteMany();
     await prisma.experiment.deleteMany();
+    await prisma.researcher.deleteMany();
+
+    const researcher = await createTestResearcher(app, 'branching-suite@test.com');
+    authHeader = researcher.authHeader;
   });
 
   afterAll(async () => {
     await prisma.sessionResponse.deleteMany();
     await prisma.session.deleteMany();
     await prisma.experimentVersion.deleteMany();
+    await prisma.expectedResponse.deleteMany();
+    await prisma.stimulus.deleteMany();
+    await prisma.trial.deleteMany();
     await prisma.experiment.deleteMany();
+    await prisma.researcher.deleteMany();
     await prisma.$disconnect();
   });
 
@@ -301,11 +315,13 @@ describe('Phase 7 — Dynamic Conditional Branching Engine', () => {
     it('6. Valid branch targets publish successfully', async () => {
       const expRes = await request(app)
         .post('/api/v1/experiments')
+        .set(authHeader)
         .send(createBranchingExperimentPayload('valid-branch-study'));
       expect(expRes.status).toBe(201);
 
       const pubRes = await request(app)
         .post(`/api/v1/experiments/${expRes.body.id}/publish`)
+        .set(authHeader)
         .send();
       expect(pubRes.status).toBe(200);
       expect(pubRes.body.status).toBe('PUBLISHED');
@@ -319,6 +335,7 @@ describe('Phase 7 — Dynamic Conditional Branching Engine', () => {
 
       const expRes = await request(app)
         .post('/api/v1/experiments')
+        .set(authHeader)
         .send(badPayload);
 
       expect(expRes.status).toBe(400);
@@ -334,6 +351,7 @@ describe('Phase 7 — Dynamic Conditional Branching Engine', () => {
 
       const expRes = await request(app)
         .post('/api/v1/experiments')
+        .set(authHeader)
         .send(badPayload);
 
       expect(expRes.status).toBe(400);
@@ -349,6 +367,7 @@ describe('Phase 7 — Dynamic Conditional Branching Engine', () => {
 
       const expRes = await request(app)
         .post('/api/v1/experiments')
+        .set(authHeader)
         .send(selfRefPayload);
 
       expect(expRes.status).toBe(400);
@@ -363,8 +382,12 @@ describe('Phase 7 — Dynamic Conditional Branching Engine', () => {
     it('10 & 12. Correct response branches to ifCorrect target and returns it in current-step', async () => {
       const expRes = await request(app)
         .post('/api/v1/experiments')
+        .set(authHeader)
         .send(createBranchingExperimentPayload('correct-branch-run'));
-      await request(app).post(`/api/v1/experiments/${expRes.body.id}/publish`).send();
+      await request(app)
+        .post(`/api/v1/experiments/${expRes.body.id}/publish`)
+        .set(authHeader)
+        .send();
 
       const sessionRes = await request(app)
         .post('/api/v1/participant/experiments/correct-branch-run/sessions')
@@ -393,8 +416,12 @@ describe('Phase 7 — Dynamic Conditional Branching Engine', () => {
     it('11. Incorrect response branches to ifIncorrect target', async () => {
       const expRes = await request(app)
         .post('/api/v1/experiments')
+        .set(authHeader)
         .send(createBranchingExperimentPayload('incorrect-branch-run'));
-      await request(app).post(`/api/v1/experiments/${expRes.body.id}/publish`).send();
+      await request(app)
+        .post(`/api/v1/experiments/${expRes.body.id}/publish`)
+        .set(authHeader)
+        .send();
 
       const sessionRes = await request(app)
         .post('/api/v1/participant/experiments/incorrect-branch-run/sessions')
@@ -415,8 +442,12 @@ describe('Phase 7 — Dynamic Conditional Branching Engine', () => {
     it('13 & 14. Branched session can continue through subsequent trials to completion', async () => {
       const expRes = await request(app)
         .post('/api/v1/experiments')
+        .set(authHeader)
         .send(createBranchingExperimentPayload('branch-to-complete-run'));
-      await request(app).post(`/api/v1/experiments/${expRes.body.id}/publish`).send();
+      await request(app)
+        .post(`/api/v1/experiments/${expRes.body.id}/publish`)
+        .set(authHeader)
+        .send();
 
       const sessionRes = await request(app)
         .post('/api/v1/participant/experiments/branch-to-complete-run/sessions')
@@ -453,9 +484,13 @@ describe('Phase 7 — Dynamic Conditional Branching Engine', () => {
       // 1. Create and publish Version 1
       const expRes = await request(app)
         .post('/api/v1/experiments')
+        .set(authHeader)
         .send(createBranchingExperimentPayload('isolation-branch-study'));
       const expId = expRes.body.id;
-      await request(app).post(`/api/v1/experiments/${expId}/publish`).send();
+      await request(app)
+        .post(`/api/v1/experiments/${expId}/publish`)
+        .set(authHeader)
+        .send();
 
       // 2. Start Session 1 on Version 1
       const s1Res = await request(app)
@@ -466,6 +501,7 @@ describe('Phase 7 — Dynamic Conditional Branching Engine', () => {
       // 3. Edit experiment to Version 2 with inverted branching: ifCorrect -> Trial 2, ifIncorrect -> Trial 3
       await request(app)
         .put(`/api/v1/experiments/${expId}`)
+        .set(authHeader)
         .send({
           title: 'Version 2 with Inverted Branching',
           trials: [
@@ -502,7 +538,10 @@ describe('Phase 7 — Dynamic Conditional Branching Engine', () => {
           ],
         });
 
-      await request(app).post(`/api/v1/experiments/${expId}/publish`).send();
+      await request(app)
+        .post(`/api/v1/experiments/${expId}/publish`)
+        .set(authHeader)
+        .send();
 
       // 4. Session 1 (on v1) submits correct response: v1 rules must route to Trial 3 (not v2's Trial 2!)
       const s1Resp = await request(app)
@@ -546,8 +585,12 @@ describe('Phase 7 — Dynamic Conditional Branching Engine', () => {
 
       const expRes = await request(app)
         .post('/api/v1/experiments')
+        .set(authHeader)
         .send(randBranchPayload);
-      await request(app).post(`/api/v1/experiments/${expRes.body.id}/publish`).send();
+      await request(app)
+        .post(`/api/v1/experiments/${expRes.body.id}/publish`)
+        .set(authHeader)
+        .send();
 
       const sessionRes = await request(app)
         .post('/api/v1/participant/experiments/rand-and-branch-study/sessions')

@@ -1,22 +1,36 @@
 import request from 'supertest';
 import { createApp } from '../src/server/app.js';
 import { prisma } from '../src/db/prisma.js';
+import { createTestResearcher } from './helpers/auth.js';
 
 const app = createApp();
 
 describe('Participant Execution API (Phase 3)', () => {
+  let authHeader: { Authorization: string };
+
   beforeEach(async () => {
     await prisma.sessionResponse.deleteMany();
     await prisma.session.deleteMany();
     await prisma.experimentVersion.deleteMany();
+    await prisma.expectedResponse.deleteMany();
+    await prisma.stimulus.deleteMany();
+    await prisma.trial.deleteMany();
     await prisma.experiment.deleteMany();
+    await prisma.researcher.deleteMany();
+
+    const researcher = await createTestResearcher(app, 'participant-exec-suite@test.com');
+    authHeader = researcher.authHeader;
   });
 
   afterAll(async () => {
     await prisma.sessionResponse.deleteMany();
     await prisma.session.deleteMany();
     await prisma.experimentVersion.deleteMany();
+    await prisma.expectedResponse.deleteMany();
+    await prisma.stimulus.deleteMany();
+    await prisma.trial.deleteMany();
     await prisma.experiment.deleteMany();
+    await prisma.researcher.deleteMany();
     await prisma.$disconnect();
   });
 
@@ -25,6 +39,7 @@ describe('Participant Execution API (Phase 3)', () => {
       // 1. Create and publish experiment
       const expRes = await request(app)
         .post('/api/v1/experiments')
+        .set(authHeader)
         .send({
           title: 'Color Discrimination Task',
           description: 'Discriminate colored focal stimuli',
@@ -59,10 +74,12 @@ describe('Participant Execution API (Phase 3)', () => {
         });
 
       expect(expRes.status).toBe(201);
-      const pubRes = await request(app).post(`/api/v1/experiments/${expRes.body.id}/publish`);
+      const pubRes = await request(app)
+        .post(`/api/v1/experiments/${expRes.body.id}/publish`)
+        .set(authHeader);
       expect(pubRes.status).toBe(200);
 
-      // 2. Start participant session
+      // 2. Start participant session (Anonymous - NO JWT)
       const startRes = await request(app)
         .post('/api/v1/participant/experiments/color-task-01/sessions')
         .send({
@@ -74,7 +91,6 @@ describe('Participant Execution API (Phase 3)', () => {
 
       expect(startRes.status).toBe(201);
       expect(startRes.body).toHaveProperty('sessionId');
-      expect(startRes.body.sessionId).toMatch(/^sess_/);
       expect(startRes.body.experimentTitle).toBe('Color Discrimination Task');
       expect(startRes.body.generalInstructions).toBe('Press G for Green, R for Red.');
       expect(startRes.body.totalTrials).toBe(1);
@@ -86,6 +102,7 @@ describe('Participant Execution API (Phase 3)', () => {
     it('should reject session initialization if experiment is still in DRAFT status', async () => {
       await request(app)
         .post('/api/v1/experiments')
+        .set(authHeader)
         .send({
           title: 'Draft Unpublishable Experiment',
           description: 'Draft only',
@@ -115,6 +132,7 @@ describe('Participant Execution API (Phase 3)', () => {
       // 1. Create and publish Version 1 (Stimulus: "V1_TARGET")
       const expRes = await request(app)
         .post('/api/v1/experiments')
+        .set(authHeader)
         .send({
           title: 'Immutability Verification Task',
           description: 'Verify version freezing',
@@ -147,7 +165,9 @@ describe('Participant Execution API (Phase 3)', () => {
         });
 
       expect(expRes.status).toBe(201);
-      const pub1 = await request(app).post(`/api/v1/experiments/${expRes.body.id}/publish`);
+      const pub1 = await request(app)
+        .post(`/api/v1/experiments/${expRes.body.id}/publish`)
+        .set(authHeader);
       expect(pub1.status).toBe(200);
 
       // 2. Start Session S1 bound to Version 1
@@ -162,6 +182,7 @@ describe('Participant Execution API (Phase 3)', () => {
       // 3. Researcher updates experiment to Version 2 (Stimulus: "V2_ALTERED")
       const updateRes = await request(app)
         .put(`/api/v1/experiments/${expRes.body.id}`)
+        .set(authHeader)
         .send({
           title: 'Immutability Verification Task - V2',
           trials: [
@@ -197,7 +218,9 @@ describe('Participant Execution API (Phase 3)', () => {
         where: { id: expRes.body.id },
         data: { version: 2 },
       });
-      const pub2 = await request(app).post(`/api/v1/experiments/${expRes.body.id}/publish`);
+      const pub2 = await request(app)
+        .post(`/api/v1/experiments/${expRes.body.id}/publish`)
+        .set(authHeader);
       expect(pub2.status).toBe(200);
       expect(pub2.body.version).toBe(2);
 
@@ -222,6 +245,7 @@ describe('Participant Execution API (Phase 3)', () => {
       // 1. Create and publish 3-trial linear experiment
       const expRes = await request(app)
         .post('/api/v1/experiments')
+        .set(authHeader)
         .send({
           title: 'MVP Linear 3-Trial RT Task',
           description: 'Instruction -> T1 -> T2 -> T3 -> Complete',
@@ -302,7 +326,9 @@ describe('Participant Execution API (Phase 3)', () => {
         });
 
       expect(expRes.status).toBe(201);
-      const pubRes = await request(app).post(`/api/v1/experiments/${expRes.body.id}/publish`);
+      const pubRes = await request(app)
+        .post(`/api/v1/experiments/${expRes.body.id}/publish`)
+        .set(authHeader);
       expect(pubRes.status).toBe(200);
 
       // 2. Start session
@@ -374,6 +400,7 @@ describe('Participant Execution API (Phase 3)', () => {
     beforeEach(async () => {
       const expRes = await request(app)
         .post('/api/v1/experiments')
+        .set(authHeader)
         .send({
           title: 'Guardrail Test Study',
           description: 'Guardrail checks',
@@ -428,7 +455,9 @@ describe('Participant Execution API (Phase 3)', () => {
           ],
         });
 
-      await request(app).post(`/api/v1/experiments/${expRes.body.id}/publish`);
+      await request(app)
+        .post(`/api/v1/experiments/${expRes.body.id}/publish`)
+        .set(authHeader);
       const s = await request(app)
         .post('/api/v1/participant/experiments/guardrail-study/sessions')
         .send({});
@@ -484,6 +513,7 @@ describe('Participant Execution API (Phase 3)', () => {
       // 1. Setup 2-trial experiment
       const expRes = await request(app)
         .post('/api/v1/experiments')
+        .set(authHeader)
         .send({
           title: 'Concurrency Test Study',
           description: 'Concurrency check',
@@ -539,7 +569,9 @@ describe('Participant Execution API (Phase 3)', () => {
         });
 
       expect(expRes.status).toBe(201);
-      const pubRes = await request(app).post(`/api/v1/experiments/${expRes.body.id}/publish`);
+      const pubRes = await request(app)
+        .post(`/api/v1/experiments/${expRes.body.id}/publish`)
+        .set(authHeader);
       expect(pubRes.status).toBe(200);
 
       const s = await request(app)

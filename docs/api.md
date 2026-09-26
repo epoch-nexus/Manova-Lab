@@ -75,14 +75,113 @@ Phase 2 backend services and validation middleware (e.g., Zod) must strictly enf
 
 ---
 
-## 4. Researcher Experiment API
+## 4. Researcher Authentication API
 
-**Base Path**: `/api/v1/experiments`  
-**Authentication Assumption**: Requires standard `Authorization: Bearer <researcher_token>` header. (Phase 8 will supply the token; all endpoints assume the researcher identity is extracted from this token).
+**Base Path**: `/api/v1/auth` (and alias `/auth`)  
+**Authentication Assumption**: Registration and Login are public. Profile (`/me`) requires `Authorization: Bearer <token>` header.
 
 ---
 
-### 4.1 Create Experiment
+### 4.1 Register Researcher
+Registers a new researcher account and returns an authentication token.
+
+* **Method**: `POST`
+* **URL**: `/api/v1/auth/register`
+* **Request Headers**:
+  * `Content-Type: application/json`
+* **Request Body Example**:
+```json
+{
+  "email": "dr.smith@university.edu",
+  "password": "SecurePassword123!",
+  "name": "Dr. Smith"
+}
+```
+* **Validation Rules**:
+  * `email`: Valid email format, lowercase normalized, unique across the platform.
+  * `password`: Minimum 8 characters. Hashed using standard salted bcrypt (10 rounds). Plaintext password is never persisted.
+  * `name`: Optional string.
+* **Success Response**: `201 Created`
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "researcher": {
+    "id": "res_8f9a2b1c-3d4e-4f5a-b6c7-d8e9f01a2b3c",
+    "email": "dr.smith@university.edu",
+    "name": "Dr. Smith",
+    "createdAt": "2026-09-26T10:00:00.000Z",
+    "updatedAt": "2026-09-26T10:00:00.000Z"
+  }
+}
+```
+* **Error Responses**:
+  * `400 Bad Request`: `{ "error": { "code": "VALIDATION_ERROR", "message": "Password must be at least 8 characters long." } }`
+  * `409 Conflict`: `{ "error": { "code": "CONFLICT", "message": "Email is already registered" } }`
+
+---
+
+### 4.2 Login Researcher
+Authenticates researcher credentials and issues a signed JWT.
+
+* **Method**: `POST`
+* **URL**: `/api/v1/auth/login`
+* **Request Headers**:
+  * `Content-Type: application/json`
+* **Request Body Example**:
+```json
+{
+  "email": "dr.smith@university.edu",
+  "password": "SecurePassword123!"
+}
+```
+* **Success Response**: `200 OK`
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "researcher": {
+    "id": "res_8f9a2b1c-3d4e-4f5a-b6c7-d8e9f01a2b3c",
+    "email": "dr.smith@university.edu",
+    "name": "Dr. Smith",
+    "createdAt": "2026-09-26T10:00:00.000Z",
+    "updatedAt": "2026-09-26T10:00:00.000Z"
+  }
+}
+```
+* **Error Responses**:
+  * `401 Unauthorized`: `{ "error": { "code": "UNAUTHORIZED", "message": "Invalid email or password" } }`
+
+---
+
+### 4.3 Get Authenticated Researcher Profile (`/me`)
+Returns the profile of the authenticated researcher. Never returns password hash.
+
+* **Method**: `GET`
+* **URL**: `/api/v1/auth/me`
+* **Request Headers**:
+  * `Authorization: Bearer <token>`
+* **Success Response**: `200 OK`
+```json
+{
+  "id": "res_8f9a2b1c-3d4e-4f5a-b6c7-d8e9f01a2b3c",
+  "email": "dr.smith@university.edu",
+  "name": "Dr. Smith",
+  "createdAt": "2026-09-26T10:00:00.000Z",
+  "updatedAt": "2026-09-26T10:00:00.000Z"
+}
+```
+* **Error Responses**:
+  * `401 Unauthorized`: `{ "error": { "code": "UNAUTHORIZED", "message": "Authentication required. Missing Bearer token." } }`
+
+---
+
+## 5. Researcher Experiment API
+
+**Base Path**: `/api/v1/experiments`  
+**Authentication Assumption**: Strictly Requires `Authorization: Bearer <researcher_token>` header. Enforces ownership: researchers can only view, update, delete, publish, and query results for experiments they own. Cross-researcher access attempts return `403 FORBIDDEN`.
+
+---
+
+### 5.1 Create Experiment
 Creates a new experiment in `DRAFT` status owned by the authenticated researcher.
 
 * **Method**: `POST`
@@ -170,7 +269,7 @@ Creates a new experiment in `DRAFT` status owned by the authenticated researcher
 
 ---
 
-### 4.2 List Researcher Experiments
+### 5.2 List Researcher Experiments
 Retrieves all experiments owned by the authenticated researcher.
 
 * **Method**: `GET`
@@ -200,7 +299,7 @@ Retrieves all experiments owned by the authenticated researcher.
 
 ---
 
-### 4.3 Get Experiment by ID
+### 5.3 Get Experiment by ID
 Retrieves the full experiment definition including all trials and configuration.
 
 * **Method**: `GET`
@@ -215,7 +314,7 @@ Retrieves the full experiment definition including all trials and configuration.
 
 ---
 
-### 4.4 Update Experiment
+### 5.4 Update Experiment
 Modifies an existing `DRAFT` experiment definition. (If already `PUBLISHED`, updates create a new `DRAFT` revision).
 
 * **Method**: `PUT`
@@ -247,7 +346,7 @@ Modifies an existing `DRAFT` experiment definition. (If already `PUBLISHED`, upd
 
 ---
 
-### 4.5 Delete Experiment
+### 5.5 Delete Experiment
 Deletes an experiment. If sessions already exist for a published experiment, deletion soft-deletes or archives the record.
 
 * **Method**: `DELETE`
@@ -261,7 +360,7 @@ Deletes an experiment. If sessions already exist for a published experiment, del
 
 ---
 
-### 4.6 Publish Experiment
+### 5.6 Publish Experiment
 Validates the experiment configuration, locks it into an immutable snapshot, and changes status to `PUBLISHED`.
 
 * **Method**: `POST`
@@ -285,14 +384,14 @@ Validates the experiment configuration, locks it into an immutable snapshot, and
 
 ---
 
-## 5. Participant API
+## 6. Participant API
 
 **Base Path**: `/api/v1/participant`  
 **Authentication Assumption**: Strictly Anonymous. No authentication tokens or researcher credentials required. Authorized via `sessionId`.
 
 ---
 
-### 5.1 Initialize Participant Session
+### 6.1 Initialize Participant Session
 Initializes an anonymous session for a published experiment using its public slug or experiment ID. Locks the session to the current immutable published snapshot.
 
 * **Method**: `POST`
@@ -371,7 +470,7 @@ Initializes an anonymous session for a published experiment using its public slu
 
 ---
 
-### 5.2 Submit Trial Response
+### 6.2 Submit Trial Response
 Submits the behavioral result for the active trial, logs measured timing telemetry, evaluates correctness, and returns the next trial (or signals session completion).
 
 * **Method**: `POST`
@@ -473,7 +572,7 @@ When submitting the response to the final trial (`nextTrialId === null`):
 
 ---
 
-### 5.3 Abandon Session Endpoint (Explicit Abort)
+### 6.3 Abandon Session Endpoint (Explicit Abort)
 * **Design Decision**: Is a dedicated "complete session" endpoint needed?
   * **Answer**: No dedicated *completion* endpoint is needed because completion is a natural, deterministic state transition reached when the final trial's response is submitted. Creating an extra "complete" call would introduce a race condition where a participant could finish trials but drop offline before the completion call, leaving results in limbo.
   * **However**, a dedicated `POST /participant/sessions/:sessionId/abandon` endpoint **is included** to capture explicit participant withdrawals (e.g., participant clicked "Exit Study", revoked consent, or closed the window). This marks `session.status = 'ABANDONED'` without discarding already recorded trials.
@@ -496,11 +595,11 @@ When submitting the response to the final trial (`nextTrialId === null`):
 
 ---
 
-## 6. Researcher Results, Analytics & Export API (Phase 5)
+## 7. Researcher Results, Analytics & Export API
 
 All researcher result endpoints are scoped to an experiment by ID: `/api/v1/experiments/:experimentId/results` (or `/experiments/:experimentId/results`).
 
-### 6.1 List Raw Trial Results
+### 7.1 List Raw Trial Results
 Retrieves trial-level participant response records with optional filtering.
 
 * **Method**: `GET`
@@ -549,7 +648,7 @@ Retrieves trial-level participant response records with optional filtering.
 
 ---
 
-### 6.2 Aggregate Summary Statistics
+### 7.2 Aggregate Summary Statistics
 Calculates descriptive statistics (mean RT, median RT, sample standard deviation, response rate, accuracy rate) across all trials or filtered to a single trial.
 
 * **Method**: `GET`
@@ -580,7 +679,7 @@ Calculates descriptive statistics (mean RT, median RT, sample standard deviation
 
 ---
 
-### 6.3 JSON Export
+### 7.3 JSON Export
 Downloads complete trial-level records as a machine-readable JSON file.
 
 * **Method**: `GET`
@@ -592,7 +691,7 @@ Downloads complete trial-level records as a machine-readable JSON file.
 
 ---
 
-### 6.4 CSV Export
+### 7.4 CSV Export
 Downloads complete trial-level records as a RFC 4180 compliant CSV file without participant identifiers to preserve anonymity.
 
 * **Method**: `GET`

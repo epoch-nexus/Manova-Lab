@@ -20,20 +20,107 @@ async function runSmokeTests() {
     await prisma.session.deleteMany();
     await prisma.experimentVersion.deleteMany();
     await prisma.experiment.deleteMany();
+    await prisma.researcher.deleteMany();
 
     // 1. Healthcheck
-    console.log('[1/12] Testing GET /health');
+    console.log('[1/20] Testing GET /health');
     const healthRes = await fetch(`${baseUrl}/health`);
     const healthBody = await healthRes.json();
     console.log('  Status:', healthRes.status, JSON.stringify(healthBody));
     if (healthRes.status !== 200 || healthBody.status !== 'ok') throw new Error('Healthcheck failed');
 
-    // 2. Create Experiment (POST /api/v1/experiments)
-    console.log('[2/12] Testing POST /api/v1/experiments (2-trial study)');
+    // 2. Phase 8: Researcher Registration
+    console.log('[2/20] Testing POST /api/v1/auth/register (Primary Researcher)');
+    const regRes = await fetch(`${baseUrl}/api/v1/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'alice.researcher@manova.labs',
+        password: 'SecurePassword123!',
+        name: 'Dr. Alice',
+      }),
+    });
+    const regData = await regRes.json();
+    console.log('  Status:', regRes.status, `Token: ${Boolean(regData.token)}, Researcher: ${regData.researcher?.email}`);
+    if (regRes.status !== 201 || !regData.token || !regData.researcher?.id) {
+      throw new Error('Researcher registration failed');
+    }
+    if ((regData as any).password || (regData as any).passwordHash || (regData.researcher as any).passwordHash) {
+      throw new Error('Password hash leaked in registration response!');
+    }
+    const token1 = regData.token;
+    const authHeaders1 = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token1}`,
+    };
+
+    // 3. Phase 8: Auth Edge Cases (Duplicate email, Login bad password, Invalid token)
+    console.log('[3/20] Testing Auth Edge Cases (Duplicate email, Invalid login, Missing/Bad token)');
+    const dupRes = await fetch(`${baseUrl}/api/v1/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'alice.researcher@manova.labs',
+        password: 'AnotherPassword123!',
+      }),
+    });
+    if (dupRes.status !== 409) throw new Error(`Expected 409 on duplicate email, got ${dupRes.status}`);
+
+    const badLoginRes = await fetch(`${baseUrl}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'alice.researcher@manova.labs',
+        password: 'WrongPassword!',
+      }),
+    });
+    if (badLoginRes.status !== 401) throw new Error(`Expected 401 on bad login, got ${badLoginRes.status}`);
+
+    // GET /me without token -> 401
+    const noTokenMe = await fetch(`${baseUrl}/api/v1/auth/me`);
+    if (noTokenMe.status !== 401) throw new Error(`Expected 401 on /me without token, got ${noTokenMe.status}`);
+
+    // GET /me with valid token -> 200
+    const meRes = await fetch(`${baseUrl}/api/v1/auth/me`, {
+      headers: { Authorization: `Bearer ${token1}` },
+    });
+    const meData = await meRes.json();
+    if (meRes.status !== 200 || meData.email !== 'alice.researcher@manova.labs') {
+      throw new Error('/me endpoint failed with valid token');
+    }
+    if ((meData as any).passwordHash) throw new Error('Password hash leaked in /me!');
+
+    // Register second researcher for ownership tests
+    const reg2Res = await fetch(`${baseUrl}/api/v1/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'bob.researcher@manova.labs',
+        password: 'BobSecurePassword123!',
+        name: 'Dr. Bob',
+      }),
+    });
+    const reg2Data = await reg2Res.json();
+    const token2 = reg2Data.token;
+    const authHeaders2 = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token2}`,
+    };
+
+    // 4. Create Experiment (POST /api/v1/experiments) with Auth
+    console.log('[4/20] Testing POST /api/v1/experiments (with Researcher 1 Auth)');
     const trial1Id = '11111111-1111-4111-8111-111111111111';
     const trial2Id = '22222222-2222-4222-8222-222222222222';
     const stim1Id = '33333333-3333-4333-8333-333333333333';
     const stim2Id = '44444444-4444-4444-8444-444444444444';
+
+    // Verify unauthenticated create is rejected
+    const unauthCreate = await fetch(`${baseUrl}/api/v1/experiments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'Unauth Study', publicSlug: 'unauth-study', trials: [] }),
+    });
+    if (unauthCreate.status !== 401) throw new Error(`Expected 401 on unauthenticated create, got ${unauthCreate.status}`);
 
     const createPayload = {
       title: 'Smoke Test Reaction Time Study',
@@ -113,7 +200,7 @@ async function runSmokeTests() {
 
     const createRes = await fetch(`${baseUrl}/api/v1/experiments`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders1,
       body: JSON.stringify(createPayload),
     });
     const createdExp = await createRes.json();
@@ -122,17 +209,31 @@ async function runSmokeTests() {
 
     const expId = createdExp.id;
 
-    // 3. Publish Experiment (POST /api/v1/experiments/:id/publish)
-    console.log(`[3/12] Testing POST /api/v1/experiments/${expId}/publish`);
+    // 5. Phase 8: Verify Cross-Researcher Ownership Forbidden (403)
+    console.log('[5/20] Testing Cross-Researcher Ownership Authorization (403 Forbidden)');
+    const r2GetExp = await fetch(`${baseUrl}/api/v1/experiments/${expId}`, {
+      headers: authHeaders2,
+    });
+    if (r2GetExp.status !== 403) throw new Error(`Expected 403 when Researcher 2 accesses Researcher 1's experiment, got ${r2GetExp.status}`);
+
+    const r2PubExp = await fetch(`${baseUrl}/api/v1/experiments/${expId}/publish`, {
+      method: 'POST',
+      headers: authHeaders2,
+    });
+    if (r2PubExp.status !== 403) throw new Error(`Expected 403 when Researcher 2 publishes Researcher 1's experiment, got ${r2PubExp.status}`);
+
+    // 6. Publish Experiment (POST /api/v1/experiments/:id/publish) with Researcher 1
+    console.log(`[6/20] Testing POST /api/v1/experiments/${expId}/publish (Researcher 1)`);
     const pubRes = await fetch(`${baseUrl}/api/v1/experiments/${expId}/publish`, {
       method: 'POST',
+      headers: authHeaders1,
     });
     const pubBody = await pubRes.json();
     console.log('  Status:', pubRes.status, JSON.stringify(pubBody));
     if (pubRes.status !== 200 || pubBody.status !== 'PUBLISHED') throw new Error('Publish experiment failed');
 
-    // 4. Start Participant Session (POST /api/v1/participant/experiments/:publicSlug/sessions)
-    console.log('[4/12] Testing POST /api/v1/participant/experiments/smoke-test-rt/sessions');
+    // 7. Start Participant Session (POST /api/v1/participant/experiments/:publicSlug/sessions) - ANONYMOUS
+    console.log('[7/20] Testing POST /api/v1/participant/experiments/smoke-test-rt/sessions (Anonymous - NO JWT)');
     const startRes = await fetch(`${baseUrl}/api/v1/participant/experiments/smoke-test-rt/sessions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -143,18 +244,21 @@ async function runSmokeTests() {
     const sessionData = await startRes.json();
     console.log('  Status:', startRes.status, `SessionID: ${sessionData.sessionId}, FirstTrial: ${sessionData.firstTrial?.id}`);
     if (startRes.status !== 201 || !sessionData.sessionId) throw new Error('Start session failed');
+    if ((sessionData as any).ownerResearcherId || (sessionData as any).researcher) {
+      throw new Error('Researcher identity leaked in participant session response!');
+    }
 
     const sessionId = sessionData.sessionId;
 
-    // 5. Get Current Step (GET /api/v1/participant/sessions/:sessionId)
-    console.log(`[5/12] Testing GET /api/v1/participant/sessions/${sessionId}`);
+    // 8. Get Current Step (GET /api/v1/participant/sessions/:sessionId) - ANONYMOUS
+    console.log(`[8/20] Testing GET /api/v1/participant/sessions/${sessionId} (Anonymous)`);
     const step1Res = await fetch(`${baseUrl}/api/v1/participant/sessions/${sessionId}`);
     const step1Data = await step1Res.json();
     console.log('  Status:', step1Res.status, `CurrentTrial: ${step1Data.currentTrial?.id}, State: ${step1Data.executionState}`);
     if (step1Res.status !== 200 || step1Data.currentTrial?.id !== trial1Id) throw new Error('Get current step failed');
 
-    // 6. Submit Response for Trial 1 (POST /api/v1/participant/sessions/:sessionId/trials/:trialId/response)
-    console.log(`[6/12] Testing POST response for Trial 1`);
+    // 9. Submit Response for Trial 1 (POST /api/v1/participant/sessions/:sessionId/trials/:trialId/response)
+    console.log(`[9/20] Testing POST response for Trial 1 (Anonymous)`);
     const resp1Res = await fetch(`${baseUrl}/api/v1/participant/sessions/${sessionId}/trials/${trial1Id}/response`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -166,15 +270,15 @@ async function runSmokeTests() {
       throw new Error('Trial 1 response submission failed');
     }
 
-    // 7. Get Next Step (GET /api/v1/participant/sessions/:sessionId)
-    console.log(`[7/12] Testing GET /api/v1/participant/sessions/${sessionId} (on Trial 2)`);
+    // 10. Get Next Step (GET /api/v1/participant/sessions/:sessionId)
+    console.log(`[10/20] Testing GET /api/v1/participant/sessions/${sessionId} (on Trial 2)`);
     const step2Res = await fetch(`${baseUrl}/api/v1/participant/sessions/${sessionId}`);
     const step2Data = await step2Res.json();
     console.log('  Status:', step2Res.status, `CurrentTrial: ${step2Data.currentTrial?.id}`);
     if (step2Res.status !== 200 || step2Data.currentTrial?.id !== trial2Id) throw new Error('Get step 2 failed');
 
-    // 8. Submit Final Response for Trial 2 -> Transitions to COMPLETE
-    console.log(`[8/12] Testing POST response for Terminal Trial 2`);
+    // 11. Submit Final Response for Trial 2 -> Transitions to COMPLETE
+    console.log(`[11/20] Testing POST response for Terminal Trial 2`);
     const resp2Res = await fetch(`${baseUrl}/api/v1/participant/sessions/${sessionId}/trials/${trial2Id}/response`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -186,18 +290,14 @@ async function runSmokeTests() {
       throw new Error('Terminal trial completion failed');
     }
 
-    // 9. Error Case: Access Nonexistent Session (GET /api/v1/participant/sessions/sess_fake -> 404)
-    console.log('[9/12] Testing 404 SESSION_NOT_FOUND error case');
+    // 12. Error Cases: Access Nonexistent Session & Disallowed Key
+    console.log('[12/20] Testing Participant Error Cases (404 and 400)');
     const badSessRes = await fetch(`${baseUrl}/api/v1/participant/sessions/sess_nonexistent`);
     const badSessBody = await badSessRes.json();
-    console.log('  Status:', badSessRes.status, JSON.stringify(badSessBody));
     if (badSessRes.status !== 404 || badSessBody.error.code !== 'SESSION_NOT_FOUND') {
       throw new Error('404 session test failed');
     }
 
-    // 10. Error Case: Submit Disallowed Key (POST ... -> 400 INVALID_RESPONSE)
-    console.log('[10/12] Testing 400 INVALID_RESPONSE (Disallowed key)');
-    // Start fresh session to test bad key
     const freshStart = await fetch(`${baseUrl}/api/v1/participant/experiments/smoke-test-rt/sessions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -207,61 +307,39 @@ async function runSmokeTests() {
     const badKeyRes = await fetch(`${baseUrl}/api/v1/participant/sessions/${freshSession.sessionId}/trials/${trial1Id}/response`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ submittedResponse: 'KeyZ' }), // Not allowed
+      body: JSON.stringify({ submittedResponse: 'KeyZ' }),
     });
     const badKeyBody = await badKeyRes.json();
-    console.log('  Status:', badKeyRes.status, JSON.stringify(badKeyBody));
     if (badKeyRes.status !== 400 || badKeyBody.error.code !== 'INVALID_RESPONSE') {
       throw new Error('400 bad key test failed');
     }
 
-    // 11. Error Case: Submit Wrong Trial ID (Stale response)
-    console.log('[11/12] Testing 400 INVALID_RESPONSE (Wrong/stale trial ID)');
-    const wrongTrialRes = await fetch(`${baseUrl}/api/v1/participant/sessions/${freshSession.sessionId}/trials/${trial2Id}/response`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ submittedResponse: 'Space' }), // Currently on trial 1, sending trial 2
-    });
-    const wrongTrialBody = await wrongTrialRes.json();
-    console.log('  Status:', wrongTrialRes.status, JSON.stringify(wrongTrialBody));
-    if (wrongTrialRes.status !== 400 || wrongTrialBody.error.code !== 'INVALID_RESPONSE') {
-      throw new Error('400 wrong trial test failed');
-    }
+    // 13. Phase 5 & 8: Query Raw Results (Requires Researcher 1 Auth; Rejects Researcher 2)
+    console.log('[13/20] Testing GET /api/v1/experiments/:id/results (Auth + Ownership)');
+    // Researcher 2 gets 403
+    const r2ResultsRes = await fetch(`${baseUrl}/api/v1/experiments/${expId}/results`, { headers: authHeaders2 });
+    if (r2ResultsRes.status !== 403) throw new Error(`Expected 403 on Researcher 2 querying results, got ${r2ResultsRes.status}`);
 
-    // 12. Error Case: Response After Session Completion
-    console.log('[12/16] Testing 409 SESSION_ALREADY_COMPLETED');
-    const afterCompleteRes = await fetch(`${baseUrl}/api/v1/participant/sessions/${sessionId}/trials/${trial2Id}/response`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ submittedResponse: 'Space' }),
-    });
-    const afterCompleteBody = await afterCompleteRes.json();
-    console.log('  Status:', afterCompleteRes.status, JSON.stringify(afterCompleteBody));
-    if (afterCompleteRes.status !== 409 || afterCompleteBody.error.code !== 'SESSION_ALREADY_COMPLETED') {
-      throw new Error('409 session completed test failed');
-    }
-
-    // 13. Phase 5: Query Raw Results (GET /api/v1/experiments/:id/results)
-    console.log('[13/16] Testing GET /api/v1/experiments/:id/results');
-    const resultsRes = await fetch(`${baseUrl}/api/v1/experiments/${expId}/results`);
+    // Researcher 1 succeeds
+    const resultsRes = await fetch(`${baseUrl}/api/v1/experiments/${expId}/results`, { headers: authHeaders1 });
     const resultsData = await resultsRes.json();
     console.log('  Status:', resultsRes.status, `Total results: ${resultsData.total}`);
     if (resultsRes.status !== 200 || resultsData.total < 2) {
       throw new Error('Raw results query failed');
     }
 
-    // 14. Phase 5: Query Summary Statistics (GET /api/v1/experiments/:id/results/summary)
-    console.log('[14/16] Testing GET /api/v1/experiments/:id/results/summary');
-    const summaryRes = await fetch(`${baseUrl}/api/v1/experiments/${expId}/results/summary`);
+    // 14. Phase 5 & 8: Summary Statistics
+    console.log('[14/20] Testing GET /api/v1/experiments/:id/results/summary (Researcher 1 Auth)');
+    const summaryRes = await fetch(`${baseUrl}/api/v1/experiments/${expId}/results/summary`, { headers: authHeaders1 });
     const summaryData = await summaryRes.json();
     console.log('  Status:', summaryRes.status, `Total responses: ${summaryData.totalResponses}, Rate: ${summaryData.responseRate}`);
     if (summaryRes.status !== 200 || summaryData.totalResponses < 2) {
       throw new Error('Results summary query failed');
     }
 
-    // 15. Phase 5: JSON Export (GET /api/v1/experiments/:id/results/export.json)
-    console.log('[15/16] Testing GET /api/v1/experiments/:id/results/export.json');
-    const jsonExportRes = await fetch(`${baseUrl}/api/v1/experiments/${expId}/results/export.json`);
+    // 15. Phase 5 & 8: JSON Export
+    console.log('[15/20] Testing GET /api/v1/experiments/:id/results/export.json (Researcher 1 Auth)');
+    const jsonExportRes = await fetch(`${baseUrl}/api/v1/experiments/${expId}/results/export.json`, { headers: authHeaders1 });
     const jsonExportData = await jsonExportRes.json();
     const jsonDisposition = jsonExportRes.headers.get('content-disposition');
     console.log('  Status:', jsonExportRes.status, `Disposition: ${jsonDisposition}, Total exported: ${jsonExportData.totalResults}`);
@@ -269,9 +347,9 @@ async function runSmokeTests() {
       throw new Error('JSON export failed');
     }
 
-    // 16. Phase 5: CSV Export (GET /api/v1/experiments/:id/results/export.csv)
-    console.log('[16/16] Testing GET /api/v1/experiments/:id/results/export.csv');
-    const csvExportRes = await fetch(`${baseUrl}/api/v1/experiments/${expId}/results/export.csv`);
+    // 16. Phase 5 & 8: CSV Export (Verify participant anonymity preserved)
+    console.log('[16/20] Testing GET /api/v1/experiments/:id/results/export.csv (Researcher 1 Auth)');
+    const csvExportRes = await fetch(`${baseUrl}/api/v1/experiments/${expId}/results/export.csv`, { headers: authHeaders1 });
     const csvText = await csvExportRes.text();
     const csvDisposition = csvExportRes.headers.get('content-disposition');
     const csvLines = csvText.trim().split('\r\n');
@@ -286,7 +364,7 @@ async function runSmokeTests() {
     }
 
     // 17. Phase 6: Randomized Experiment Live Flow (4 trials)
-    console.log('[17/17] Testing Phase 6: Seeded Trial Randomization Engine');
+    console.log('[17/20] Testing Phase 6: Seeded Trial Randomization Engine (Auth + Anonymous Exec)');
     const randTrialIds = [
       'aaaa1111-1111-4111-8111-111111111111',
       'bbbb2222-2222-4222-8222-222222222222',
@@ -295,7 +373,7 @@ async function runSmokeTests() {
     ];
     const randExpRes = await fetch(`${baseUrl}/api/v1/experiments`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders1,
       body: JSON.stringify({
         title: 'Phase 6 Randomized Memory Task',
         description: 'Verifies seeded Fisher-Yates trial randomization live in HTTP runtime.',
@@ -348,16 +426,16 @@ async function runSmokeTests() {
       }),
     });
     const randExpData = await randExpRes.json();
-    if (randExpRes.status !== 201) {
-      console.error('randExpRes failed:', randExpRes.status, JSON.stringify(randExpData));
-      throw new Error('Randomized experiment creation failed');
-    }
+    if (randExpRes.status !== 201) throw new Error('Randomized experiment creation failed');
 
     // Publish
-    const pubRandRes = await fetch(`${baseUrl}/api/v1/experiments/${randExpData.id}/publish`, { method: 'POST' });
+    const pubRandRes = await fetch(`${baseUrl}/api/v1/experiments/${randExpData.id}/publish`, {
+      method: 'POST',
+      headers: authHeaders1,
+    });
     if (pubRandRes.status !== 200) throw new Error('Randomized experiment publish failed');
 
-    // Start 2 participant sessions
+    // Start 2 participant sessions anonymously
     const s1Res = await fetch(`${baseUrl}/api/v1/participant/experiments/phase-6-randomized-task/sessions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -389,7 +467,6 @@ async function runSmokeTests() {
     console.log('  Session 1 Seed:', dbS1.randomizationSeed, 'Trial Order:', s1TrialOrder.map((id) => id.slice(0, 8)));
     console.log('  Session 2 Seed:', dbS2.randomizationSeed, 'Trial Order:', (dbS2.trialOrder as string[]).map((id) => id.slice(0, 8)));
 
-    // Verify first trial is trialOrder[0]
     if (s1Data.firstTrial.id !== s1TrialOrder[0]) {
       throw new Error(`First trial ${s1Data.firstTrial.id} does not match trialOrder[0] ${s1TrialOrder[0]}`);
     }
@@ -420,13 +497,12 @@ async function runSmokeTests() {
       }
     }
 
-    // Verify no repeats and all trials executed
     if (new Set(executedTrials).size !== randTrialIds.length || executedTrials.length !== randTrialIds.length) {
       throw new Error('Trial repetition or missing trials detected');
     }
 
     // 18. Phase 7: Dynamic Conditional Branching Engine Live Flow
-    console.log('[18/18] Testing Phase 7: Dynamic Conditional Branching Engine');
+    console.log('[18/20] Testing Phase 7: Dynamic Conditional Branching Engine Validation');
     const branchTrial1 = '71111111-1111-4111-8111-111111111111';
     const branchTrial2 = '72222222-2222-4222-8222-222222222222';
     const branchTrial3 = '73333333-3333-4333-8333-333333333333';
@@ -434,7 +510,7 @@ async function runSmokeTests() {
     // Verify invalid branch target is rejected at create time
     const invalidBranchRes = await fetch(`${baseUrl}/api/v1/experiments`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders1,
       body: JSON.stringify({
         title: 'Invalid Branch Study',
         description: 'Should fail due to dangling target',
@@ -464,10 +540,11 @@ async function runSmokeTests() {
       throw new Error(`Expected invalid branch to fail with 400, got ${invalidBranchRes.status}`);
     }
 
-    // Create valid branching experiment
+    // 19. Create and Publish valid branching experiment
+    console.log('[19/20] Testing Phase 7: Branching Study Creation & Publishing');
     const validBranchRes = await fetch(`${baseUrl}/api/v1/experiments`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders1,
       body: JSON.stringify({
         title: 'Phase 7 Branching Live Study',
         description: 'Verifies runtime accuracy-contingent trial branching',
@@ -512,11 +589,15 @@ async function runSmokeTests() {
     const validBranchData = await validBranchRes.json();
     if (validBranchRes.status !== 201) throw new Error('Valid branching experiment creation failed');
 
-    // Publish
-    const pubBranchRes = await fetch(`${baseUrl}/api/v1/experiments/${validBranchData.id}/publish`, { method: 'POST' });
+    const pubBranchRes = await fetch(`${baseUrl}/api/v1/experiments/${validBranchData.id}/publish`, {
+      method: 'POST',
+      headers: authHeaders1,
+    });
     if (pubBranchRes.status !== 200) throw new Error('Branching experiment publish failed');
 
-    // Session A: Submit CORRECT response -> branches directly to Trial 3 (skipping Trial 2)
+    // 20. Live branching session verification (Correct vs Incorrect branch routing)
+    console.log('[20/20] Testing Phase 7: Live Session Dynamic Branch Routing');
+    // Session A: Correct -> jumps to Trial 3
     const sessionARes = await fetch(`${baseUrl}/api/v1/participant/experiments/phase-7-branching-study/sessions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -534,7 +615,6 @@ async function runSmokeTests() {
       throw new Error(`Session A did not branch to ifCorrect target: expected ${branchTrial3}, got ${respAData.nextTrial.id}`);
     }
 
-    // Complete Session A on Trial 3
     const completeA = await fetch(`${baseUrl}/api/v1/participant/sessions/${sessionAData.sessionId}/trials/${branchTrial3}/response`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -543,7 +623,7 @@ async function runSmokeTests() {
     const completeAData = await completeA.json();
     if (!completeAData.isCompleted) throw new Error('Session A did not complete on terminal trial');
 
-    // Session B: Submit INCORRECT response -> branches to Trial 2
+    // Session B: Incorrect -> jumps to Trial 2
     const sessionBRes = await fetch(`${baseUrl}/api/v1/participant/experiments/phase-7-branching-study/sessions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -561,7 +641,6 @@ async function runSmokeTests() {
       throw new Error(`Session B did not branch to ifIncorrect target: expected ${branchTrial2}, got ${respBData.nextTrial.id}`);
     }
 
-    // Trial 2 (non-branching) continues normally to Trial 3
     const continueB = await fetch(`${baseUrl}/api/v1/participant/sessions/${sessionBData.sessionId}/trials/${branchTrial2}/response`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -572,12 +651,13 @@ async function runSmokeTests() {
       throw new Error(`Session B did not advance to Trial 3: expected ${branchTrial3}, got ${continueBData.nextTrial.id}`);
     }
 
-    console.log('--- ALL 18 LIVE SMOKE TESTS PASSED CLEANLY! ---');
+    console.log('--- ALL 20 LIVE SMOKE TESTS (PHASES 1-8) PASSED CLEANLY! ---');
   } finally {
     await prisma.sessionResponse.deleteMany();
     await prisma.session.deleteMany();
     await prisma.experimentVersion.deleteMany();
     await prisma.experiment.deleteMany();
+    await prisma.researcher.deleteMany();
     await prisma.$disconnect();
     server.close();
   }

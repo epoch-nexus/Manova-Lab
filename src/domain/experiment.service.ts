@@ -4,7 +4,7 @@ import {
   updateExperimentSchema,
   publishValidationSchema,
 } from '../schemas/experiment.schema.js';
-import { NotFoundError, ValidationError } from '../server/errors.js';
+import { NotFoundError, ValidationError, ForbiddenError } from '../server/errors.js';
 import type {
   Experiment,
   Trial,
@@ -16,7 +16,7 @@ export class ExperimentService {
   /**
    * Creates a new experiment in DRAFT status.
    */
-  async createExperiment(input: unknown) {
+  async createExperiment(input: unknown, researcherId: string) {
     const validated = createExperimentSchema.parse(input);
 
     const created = await prisma.experiment.create({
@@ -34,7 +34,7 @@ export class ExperimentService {
         }) as Prisma.InputJsonValue,
         status: 'DRAFT',
         version: 1,
-        ownerResearcherId: 'res_9a8b7c6d-5e4f-4a3b-2c1d-0e9f8a7b6c5d',
+        ownerResearcherId: researcherId,
         trials: validated.trials && validated.trials.length > 0
           ? {
               create: this.mapTrialsToPrismaCreate(validated.trials),
@@ -64,8 +64,9 @@ export class ExperimentService {
   /**
    * Lists all experiments owned by the researcher.
    */
-  async listExperiments() {
+  async listExperiments(researcherId?: string) {
     const experiments = await prisma.experiment.findMany({
+      where: researcherId ? { ownerResearcherId: researcherId } : undefined,
       orderBy: { createdAt: 'desc' },
       include: {
         _count: {
@@ -92,7 +93,7 @@ export class ExperimentService {
   /**
    * Retrieves full experiment definition with trials, stimuli, and expected responses.
    */
-  async getExperimentById(id: string): Promise<Experiment> {
+  async getExperimentById(id: string, researcherId?: string): Promise<Experiment> {
     const exp = await prisma.experiment.findUnique({
       where: { id },
       include: {
@@ -110,18 +111,26 @@ export class ExperimentService {
       throw new NotFoundError(`Experiment '${id}' not found`);
     }
 
+    if (researcherId && exp.ownerResearcherId !== researcherId) {
+      throw new ForbiddenError('You do not own this experiment');
+    }
+
     return this.formatExperiment(exp);
   }
 
   /**
    * Updates an existing experiment.
    */
-  async updateExperiment(id: string, input: unknown) {
+  async updateExperiment(id: string, input: unknown, researcherId?: string) {
     const validated = updateExperimentSchema.parse(input);
 
     const existing = await prisma.experiment.findUnique({ where: { id } });
     if (!existing) {
       throw new NotFoundError(`Experiment '${id}' not found`);
+    }
+
+    if (researcherId && existing.ownerResearcherId !== researcherId) {
+      throw new ForbiddenError('You do not own this experiment');
     }
 
     const isPublished = existing.status === 'PUBLISHED';
@@ -170,10 +179,14 @@ export class ExperimentService {
   /**
    * Deletes an experiment.
    */
-  async deleteExperiment(id: string): Promise<void> {
+  async deleteExperiment(id: string, researcherId?: string): Promise<void> {
     const existing = await prisma.experiment.findUnique({ where: { id } });
     if (!existing) {
       throw new NotFoundError(`Experiment '${id}' not found`);
+    }
+
+    if (researcherId && existing.ownerResearcherId !== researcherId) {
+      throw new ForbiddenError('You do not own this experiment');
     }
 
     await prisma.experiment.delete({ where: { id } });
@@ -185,8 +198,8 @@ export class ExperimentService {
    * 2. Freezes snapshot into ExperimentVersion
    * 3. Transitions status to PUBLISHED
    */
-  async publishExperiment(id: string): Promise<PublishExperimentResponse> {
-    const fullExperiment = await this.getExperimentById(id);
+  async publishExperiment(id: string, researcherId?: string): Promise<PublishExperimentResponse> {
+    const fullExperiment = await this.getExperimentById(id, researcherId);
 
     // Validate completeness for publishing
     const validationResult = publishValidationSchema.safeParse(fullExperiment);

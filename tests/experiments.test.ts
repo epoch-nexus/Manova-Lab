@@ -1,16 +1,36 @@
 import request from 'supertest';
 import { createApp } from '../src/server/app.js';
 import { prisma } from '../src/db/prisma.js';
+import { createTestResearcher } from './helpers/auth.js';
 
 const app = createApp();
 
 describe('Researcher Experiments API (Phase 2)', () => {
+  let authHeader: { Authorization: string };
+
   beforeEach(async () => {
+    await prisma.sessionResponse.deleteMany();
+    await prisma.session.deleteMany();
+    await prisma.experimentVersion.deleteMany();
+    await prisma.expectedResponse.deleteMany();
+    await prisma.stimulus.deleteMany();
+    await prisma.trial.deleteMany();
     await prisma.experiment.deleteMany();
+    await prisma.researcher.deleteMany();
+
+    const researcher = await createTestResearcher(app, 'experiments-suite@test.com');
+    authHeader = researcher.authHeader;
   });
 
   afterAll(async () => {
+    await prisma.sessionResponse.deleteMany();
+    await prisma.session.deleteMany();
+    await prisma.experimentVersion.deleteMany();
+    await prisma.expectedResponse.deleteMany();
+    await prisma.stimulus.deleteMany();
+    await prisma.trial.deleteMany();
     await prisma.experiment.deleteMany();
+    await prisma.researcher.deleteMany();
     await prisma.$disconnect();
   });
 
@@ -80,6 +100,7 @@ describe('Researcher Experiments API (Phase 2)', () => {
 
       const res = await request(app)
         .post('/api/v1/experiments')
+        .set(authHeader)
         .send(payload);
 
       expect(res.status).toBe(201);
@@ -93,6 +114,7 @@ describe('Researcher Experiments API (Phase 2)', () => {
     it('should reject creation with malformed input (missing title and invalid slug)', async () => {
       const res = await request(app)
         .post('/api/v1/experiments')
+        .set(authHeader)
         .send({
           title: '', // Too short
           description: '',
@@ -112,10 +134,16 @@ describe('Researcher Experiments API (Phase 2)', () => {
         publicSlug: 'unique-study-slug',
       };
 
-      const first = await request(app).post('/api/v1/experiments').send(payload);
+      const first = await request(app)
+        .post('/api/v1/experiments')
+        .set(authHeader)
+        .send(payload);
       expect(first.status).toBe(201);
 
-      const duplicate = await request(app).post('/api/v1/experiments').send(payload);
+      const duplicate = await request(app)
+        .post('/api/v1/experiments')
+        .set(authHeader)
+        .send(payload);
       expect(duplicate.status).toBe(409);
       expect(duplicate.body.error.code).toBe('INVALID_EXPERIMENT');
     });
@@ -123,19 +151,27 @@ describe('Researcher Experiments API (Phase 2)', () => {
 
   describe('GET /experiments (List Experiments)', () => {
     it('should retrieve list of all experiments with trial counts', async () => {
-      await request(app).post('/api/v1/experiments').send({
-        title: 'Study 1',
-        description: 'Description 1',
-        publicSlug: 'study-1',
-      });
+      await request(app)
+        .post('/api/v1/experiments')
+        .set(authHeader)
+        .send({
+          title: 'Study 1',
+          description: 'Description 1',
+          publicSlug: 'study-1',
+        });
 
-      await request(app).post('/api/v1/experiments').send({
-        title: 'Study 2',
-        description: 'Description 2',
-        publicSlug: 'study-2',
-      });
+      await request(app)
+        .post('/api/v1/experiments')
+        .set(authHeader)
+        .send({
+          title: 'Study 2',
+          description: 'Description 2',
+          publicSlug: 'study-2',
+        });
 
-      const res = await request(app).get('/api/v1/experiments');
+      const res = await request(app)
+        .get('/api/v1/experiments')
+        .set(authHeader);
       expect(res.status).toBe(200);
       expect(res.body.total).toBe(2);
       expect(res.body.experiments).toHaveLength(2);
@@ -147,6 +183,7 @@ describe('Researcher Experiments API (Phase 2)', () => {
     it('should return full experiment with trials and stimuli', async () => {
       const created = await request(app)
         .post('/api/v1/experiments')
+        .set(authHeader)
         .send({
           title: 'Single Retrieve Study',
           description: 'Desc',
@@ -174,11 +211,14 @@ describe('Researcher Experiments API (Phase 2)', () => {
                 evaluationMode: 'exact_match',
               },
               nextTrialId: null,
+              branching: null,
             },
           ],
         });
 
-      const res = await request(app).get(`/api/v1/experiments/${created.body.id}`);
+      const res = await request(app)
+        .get(`/api/v1/experiments/${created.body.id}`)
+        .set(authHeader);
       expect(res.status).toBe(200);
       expect(res.body.id).toBe(created.body.id);
       expect(res.body.trials).toHaveLength(1);
@@ -187,7 +227,9 @@ describe('Researcher Experiments API (Phase 2)', () => {
     });
 
     it('should return 404 EXPERIMENT_NOT_FOUND when requesting nonexistent ID', async () => {
-      const res = await request(app).get('/api/v1/experiments/00000000-0000-0000-0000-000000000000');
+      const res = await request(app)
+        .get('/api/v1/experiments/00000000-0000-0000-0000-000000000000')
+        .set(authHeader);
       expect(res.status).toBe(404);
       expect(res.body.error.code).toBe('EXPERIMENT_NOT_FOUND');
     });
@@ -195,14 +237,18 @@ describe('Researcher Experiments API (Phase 2)', () => {
 
   describe('PUT /experiments/:id (Update Experiment)', () => {
     it('should update experiment metadata and configuration', async () => {
-      const created = await request(app).post('/api/v1/experiments').send({
-        title: 'Original Title',
-        description: 'Original Desc',
-        publicSlug: 'original-slug',
-      });
+      const created = await request(app)
+        .post('/api/v1/experiments')
+        .set(authHeader)
+        .send({
+          title: 'Original Title',
+          description: 'Original Desc',
+          publicSlug: 'original-slug',
+        });
 
       const updated = await request(app)
         .put(`/api/v1/experiments/${created.body.id}`)
+        .set(authHeader)
         .send({
           title: 'Revised Title',
           description: 'Updated Description',
@@ -211,7 +257,9 @@ describe('Researcher Experiments API (Phase 2)', () => {
       expect(updated.status).toBe(200);
       expect(updated.body.title).toBe('Revised Title');
 
-      const fetched = await request(app).get(`/api/v1/experiments/${created.body.id}`);
+      const fetched = await request(app)
+        .get(`/api/v1/experiments/${created.body.id}`)
+        .set(authHeader);
       expect(fetched.body.title).toBe('Revised Title');
       expect(fetched.body.description).toBe('Updated Description');
     });
@@ -219,6 +267,7 @@ describe('Researcher Experiments API (Phase 2)', () => {
     it('should return 404 when updating nonexistent experiment', async () => {
       const res = await request(app)
         .put('/api/v1/experiments/00000000-0000-0000-0000-000000000000')
+        .set(authHeader)
         .send({ title: 'New Title' });
 
       expect(res.status).toBe(404);
@@ -228,21 +277,30 @@ describe('Researcher Experiments API (Phase 2)', () => {
 
   describe('DELETE /experiments/:id (Delete Experiment)', () => {
     it('should delete an experiment and cascade delete its trials', async () => {
-      const created = await request(app).post('/api/v1/experiments').send({
-        title: 'To Be Deleted',
-        description: 'Desc',
-        publicSlug: 'to-delete',
-      });
+      const created = await request(app)
+        .post('/api/v1/experiments')
+        .set(authHeader)
+        .send({
+          title: 'To Be Deleted',
+          description: 'Desc',
+          publicSlug: 'to-delete',
+        });
 
-      const del = await request(app).delete(`/api/v1/experiments/${created.body.id}`);
+      const del = await request(app)
+        .delete(`/api/v1/experiments/${created.body.id}`)
+        .set(authHeader);
       expect(del.status).toBe(204);
 
-      const check = await request(app).get(`/api/v1/experiments/${created.body.id}`);
+      const check = await request(app)
+        .get(`/api/v1/experiments/${created.body.id}`)
+        .set(authHeader);
       expect(check.status).toBe(404);
     });
 
     it('should return 404 when deleting nonexistent experiment', async () => {
-      const res = await request(app).delete('/api/v1/experiments/00000000-0000-0000-0000-000000000000');
+      const res = await request(app)
+        .delete('/api/v1/experiments/00000000-0000-0000-0000-000000000000')
+        .set(authHeader);
       expect(res.status).toBe(404);
       expect(res.body.error.code).toBe('EXPERIMENT_NOT_FOUND');
     });
@@ -253,6 +311,7 @@ describe('Researcher Experiments API (Phase 2)', () => {
       // 1. Create complete 2-trial experiment
       const created = await request(app)
         .post('/api/v1/experiments')
+        .set(authHeader)
         .send({
           title: 'Publishable Visual RT Experiment',
           description: 'Valid study ready to publish.',
@@ -280,6 +339,7 @@ describe('Researcher Experiments API (Phase 2)', () => {
                 evaluationMode: 'exact_match',
               },
               nextTrialId: '77777777-7777-4777-8777-777777777777',
+              branching: null,
             },
             {
               id: '77777777-7777-4777-8777-777777777777',
@@ -303,12 +363,15 @@ describe('Researcher Experiments API (Phase 2)', () => {
                 evaluationMode: 'exact_match',
               },
               nextTrialId: null, // Terminal trial
+              branching: null,
             },
           ],
         });
 
       // 2. Publish
-      const pubRes = await request(app).post(`/api/v1/experiments/${created.body.id}/publish`);
+      const pubRes = await request(app)
+        .post(`/api/v1/experiments/${created.body.id}/publish`)
+        .set(authHeader);
       expect(pubRes.status).toBe(200);
       expect(pubRes.body.status).toBe('PUBLISHED');
       expect(pubRes.body.version).toBe(1);
@@ -330,13 +393,18 @@ describe('Researcher Experiments API (Phase 2)', () => {
     });
 
     it('should reject publish with 422 VALIDATION_ERROR when experiment has zero trials', async () => {
-      const emptyExp = await request(app).post('/api/v1/experiments').send({
-        title: 'Empty Experiment Without Trials',
-        description: 'Has no trials',
-        publicSlug: 'empty-no-trials',
-      });
+      const emptyExp = await request(app)
+        .post('/api/v1/experiments')
+        .set(authHeader)
+        .send({
+          title: 'Empty Experiment Without Trials',
+          description: 'Has no trials',
+          publicSlug: 'empty-no-trials',
+        });
 
-      const res = await request(app).post(`/api/v1/experiments/${emptyExp.body.id}/publish`);
+      const res = await request(app)
+        .post(`/api/v1/experiments/${emptyExp.body.id}/publish`)
+        .set(authHeader);
       expect(res.status).toBe(422);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
       expect(res.body.error.message).toContain('at least one trial');
@@ -345,6 +413,7 @@ describe('Researcher Experiments API (Phase 2)', () => {
     it('should reject publish when trial references a nonexistent nextTrialId', async () => {
       const brokenPointerExp = await request(app)
         .post('/api/v1/experiments')
+        .set(authHeader)
         .send({
           title: 'Broken Pointer Experiment',
           description: 'Has dangling pointer',
@@ -383,7 +452,9 @@ describe('Researcher Experiments API (Phase 2)', () => {
         },
       });
 
-      const res = await request(app).post(`/api/v1/experiments/${brokenPointerExp.body.id}/publish`);
+      const res = await request(app)
+        .post(`/api/v1/experiments/${brokenPointerExp.body.id}/publish`)
+        .set(authHeader);
       expect(res.status).toBe(422);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
       expect(res.body.error.message).toContain('does not exist in this experiment');
@@ -392,6 +463,7 @@ describe('Researcher Experiments API (Phase 2)', () => {
     it('should reject publish when experiment has no terminal trial (all trials loop)', async () => {
       const loopingExp = await request(app)
         .post('/api/v1/experiments')
+        .set(authHeader)
         .send({
           title: 'Looping Experiment',
           description: 'No terminal trial',
@@ -429,7 +501,9 @@ describe('Researcher Experiments API (Phase 2)', () => {
         },
       });
 
-      const res = await request(app).post(`/api/v1/experiments/${loopingExp.body.id}/publish`);
+      const res = await request(app)
+        .post(`/api/v1/experiments/${loopingExp.body.id}/publish`)
+        .set(authHeader);
       expect(res.status).toBe(422);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
       expect(res.body.error.message).toContain('at least one terminal trial');

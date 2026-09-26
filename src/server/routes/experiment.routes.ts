@@ -1,8 +1,12 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { ExperimentService } from '../../domain/experiment.service.js';
+import { requireAuth } from '../middleware/auth.js';
 
 export const experimentRouter = Router();
 const experimentService = new ExperimentService();
+
+// Protect all researcher experiment routes with JWT authentication
+experimentRouter.use(requireAuth);
 
 /**
  * POST /experiments
@@ -12,7 +16,8 @@ experimentRouter.post(
   '/',
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const result = await experimentService.createExperiment(req.body);
+      const researcherId = req.researcher!.id;
+      const result = await experimentService.createExperiment(req.body, researcherId);
       res.status(201).json(result);
     } catch (err) {
       next(err);
@@ -26,9 +31,10 @@ experimentRouter.post(
  */
 experimentRouter.get(
   '/',
-  async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const result = await experimentService.listExperiments();
+      const researcherId = req.researcher!.id;
+      const result = await experimentService.listExperiments(researcherId);
       res.status(200).json(result);
     } catch (err) {
       next(err);
@@ -44,7 +50,8 @@ experimentRouter.get(
   '/:id',
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const result = await experimentService.getExperimentById(req.params.id as string);
+      const researcherId = req.researcher!.id;
+      const result = await experimentService.getExperimentById(req.params.id as string, researcherId);
       res.status(200).json(result);
     } catch (err) {
       next(err);
@@ -60,9 +67,11 @@ experimentRouter.put(
   '/:id',
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      const researcherId = req.researcher!.id;
       const result = await experimentService.updateExperiment(
         req.params.id as string,
-        req.body
+        req.body,
+        researcherId
       );
       res.status(200).json(result);
     } catch (err) {
@@ -79,7 +88,8 @@ experimentRouter.delete(
   '/:id',
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      await experimentService.deleteExperiment(req.params.id as string);
+      const researcherId = req.researcher!.id;
+      await experimentService.deleteExperiment(req.params.id as string, researcherId);
       res.status(204).send();
     } catch (err) {
       next(err);
@@ -95,7 +105,8 @@ experimentRouter.post(
   '/:id/publish',
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const result = await experimentService.publishExperiment(req.params.id as string);
+      const researcherId = req.researcher!.id;
+      const result = await experimentService.publishExperiment(req.params.id as string, researcherId);
       res.status(200).json(result);
     } catch (err) {
       next(err);
