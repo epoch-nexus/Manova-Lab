@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import FadeIn from '../components/FadeIn';
 
 export default function SciencePage() {
   const [activeStep, setActiveStep] = useState(4);
@@ -113,7 +114,7 @@ export default function SciencePage() {
         </div>
 
         {/* Title & Description */}
-        <div className="space-y-3">
+        <FadeIn className="space-y-3">
           <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
             High-Precision Telemetry &amp; Timestamp Architecture
           </h1>
@@ -124,10 +125,10 @@ export default function SciencePage() {
             <code className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono text-xs text-emerald-700">performance.now()</code>{' '}
             monotonic hardware clocks.
           </p>
-        </div>
+        </FadeIn>
 
         {/* 4 Metric Badges in Card */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm">
+        <FadeIn delay={100} className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm">
           <div>
             <div className="text-xs font-mono uppercase tracking-wider text-slate-500">Clock Resolution</div>
             <div className="text-2xl sm:text-3xl font-extrabold font-mono text-slate-900 mt-1">5.0 µs</div>
@@ -148,11 +149,11 @@ export default function SciencePage() {
             <div className="text-2xl sm:text-3xl font-extrabold font-mono text-slate-900 mt-1">0.120 ms</div>
             <div className="text-xs text-slate-500 mt-0.5">Keyboard raw event dispatch</div>
           </div>
-        </div>
+        </FadeIn>
 
         {/* Visual Proof / Hardware Verification Diagrams */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="md:col-span-2 bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex flex-col justify-between">
+          <FadeIn delay={100} className="md:col-span-2 bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-mono uppercase tracking-wider text-slate-500">FIG 0.1 // PHYSICAL DISPLAY TIMING CHAIN</span>
@@ -182,9 +183,9 @@ export default function SciencePage() {
                 </div>
               </div>
             </div>
-          </div>
+          </FadeIn>
 
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex flex-col justify-between">
+          <FadeIn delay={200} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex flex-col justify-between">
             <div>
               <div className="text-xs font-mono uppercase tracking-wider text-slate-500 mb-2">FIG 0.2 // STIMULUS ONSET SPECTRUM</div>
               <h3 className="text-lg font-bold text-slate-900">Phosphor Rise Time</h3>
@@ -211,21 +212,21 @@ export default function SciencePage() {
                 <span className="text-emerald-400 font-bold">&lt; 0.001 ms</span>
               </div>
             </div>
-          </div>
+          </FadeIn>
         </div>
 
         {/* Core Engineering Foundations (4 Cards) */}
         <div>
-          <div className="flex items-center gap-2 mb-4">
+          <FadeIn className="flex items-center gap-2 mb-4">
             <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
             <h2 className="text-base font-bold font-mono uppercase tracking-wider text-slate-700">
               Core Engineering Foundations
             </h2>
-          </div>
+          </FadeIn>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Card 1 */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-3">
+            <FadeIn delay={100} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-mono text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded">
                   FOUNDATION #01
@@ -245,10 +246,10 @@ requestAnimationFrame(() => {
   });
 });`}
               </pre>
-            </div>
+            </FadeIn>
 
             {/* Card 2 */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-3">
+            <FadeIn delay={200} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-mono text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded">
                   FOUNDATION #02
@@ -265,10 +266,10 @@ const onset = performance.now();
 // Event callback directly receives high-precision DOMHighResTimeStamp
 const rt = event.timeStamp - onset;`}
               </pre>
-            </div>
+            </FadeIn>
 
             {/* Card 3 */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-3">
+            <FadeIn delay={300} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-mono text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded">
                   FOUNDATION #03
@@ -285,10 +286,10 @@ const rt = event.timeStamp - onset;`}
               <p className="text-[11px] text-slate-500 text-center">
                 Verified zero negative RTs; strict sub-frame timeout evaluation
               </p>
-            </div>
+            </FadeIn>
 
             {/* Card 4 */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-3">
+            <FadeIn delay={400} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-mono text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded">
                   FOUNDATION #04
@@ -303,12 +304,12 @@ const rt = event.timeStamp - onset;`}
 {`await imageBitmap.decode(); // GPU VRAM cache
 audioContext.decodeAudioData(buffer); // Low-latency buffer`}
               </pre>
-            </div>
+            </FadeIn>
           </div>
         </div>
 
         {/* Precision Diagnostics Subsystem (Live Monotonic Core) */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-6">
+        <FadeIn className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-4">
             <div>
               <div className="flex items-center gap-2">
@@ -384,10 +385,10 @@ audioContext.decodeAudioData(buffer); // Low-latency buffer`}
               ))}
             </div>
           </div>
-        </div>
+        </FadeIn>
 
         {/* Live Session Trial Telemetry Ledger */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+        <FadeIn delay={100} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-bold text-slate-900">Live Session Trial Telemetry Ledger</h3>
@@ -428,10 +429,10 @@ audioContext.decodeAudioData(buffer); // Low-latency buffer`}
               </tbody>
             </table>
           </div>
-        </div>
+        </FadeIn>
 
         {/* IRB & NIST Traceability Guarantee */}
-        <div className="bg-emerald-900 text-white rounded-2xl p-6 shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
+        <FadeIn delay={100} className="bg-emerald-900 text-white rounded-2xl p-6 shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-800 flex items-center justify-center text-white">
               <span className="material-symbols-outlined text-[24px]">verified_user</span>
@@ -449,7 +450,7 @@ audioContext.decodeAudioData(buffer); // Low-latency buffer`}
           >
             Launch Researcher Console
           </Link>
-        </div>
+        </FadeIn>
 
       </main>
 

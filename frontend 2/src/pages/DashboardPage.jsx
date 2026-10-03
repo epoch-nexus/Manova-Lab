@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import FadeIn from '../components/FadeIn';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -254,7 +255,7 @@ export default function DashboardPage() {
 
         <div className="max-w-7xl mx-auto px-4 sm:px-8 pt-8 flex flex-col gap-8">
           {/* Page Title & Main Actions */}
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+          <FadeIn className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
             <div className="flex flex-col gap-1.5">
               <h1 className="text-3xl sm:text-4xl font-extrabold text-on-surface tracking-tight font-heading">
                 My Experiments
@@ -273,17 +274,17 @@ export default function DashboardPage() {
                 <span>+ Create Experiment</span>
               </button>
             </div>
-          </div>
+          </FadeIn>
 
           {/* Conditional Views: Loading, Empty, or Populated */}
           {devState === 'loading' ? (
-            <div className="w-full bg-surface-container-lowest rounded-xl border border-surface-container p-12 flex flex-col items-center justify-center text-center shadow-xs">
+            <FadeIn delay={100} className="w-full bg-surface-container-lowest rounded-xl border border-surface-container p-12 flex flex-col items-center justify-center text-center shadow-xs">
               <span className="w-8 h-8 rounded-full border-3 border-emerald-500 border-t-transparent animate-spin mb-4"></span>
               <h3 className="font-heading font-bold text-lg text-on-surface">Synchronizing Protocol Descriptors</h3>
               <p className="font-mono text-xs text-on-surface-variant mt-1">Polling edge cache from Node #884-PX...</p>
-            </div>
+            </FadeIn>
           ) : filteredExperiments.length === 0 ? (
-            <div className="w-full bg-surface-container-lowest rounded-xl border border-surface-container p-12 flex flex-col items-center justify-center text-center shadow-xs">
+            <FadeIn delay={100} className="w-full bg-surface-container-lowest rounded-xl border border-surface-container p-12 flex flex-col items-center justify-center text-center shadow-xs">
               <div className="w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 mb-4 border border-emerald-100">
                 <span className="material-symbols-outlined text-[32px]">science</span>
               </div>
@@ -312,10 +313,10 @@ export default function DashboardPage() {
                   <span>Load Seeded Demo (Stroop Reaction Time)</span>
                 </button>
               </div>
-            </div>
+            </FadeIn>
           ) : viewMode === 'table' ? (
             /* Table View */
-            <div className="w-full bg-surface-container-lowest rounded-xl border border-surface-container shadow-xs overflow-hidden">
+            <FadeIn delay={100} className="w-full bg-surface-container-lowest rounded-xl border border-surface-container shadow-xs overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse min-w-[980px]">
                   <thead>
@@ -517,63 +518,65 @@ export default function DashboardPage() {
                   </button>
                 </div>
               </div>
-            </div>
+            </FadeIn>
           ) : (
             /* Grid View */
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {filteredExperiments.map(exp => (
-                <div key={exp.id} className="bg-surface-container-lowest p-6 rounded-xl border border-surface-container shadow-xs hover:border-emerald-300 transition-all flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs text-emerald-700 font-bold uppercase tracking-wider">{exp.id}</span>
-                        <span className="px-1.5 py-0.5 bg-surface-container text-on-surface-variant font-mono text-[10px] rounded uppercase font-semibold">
-                          {exp.version}
-                        </span>
+              {filteredExperiments.map((exp, idx) => (
+                <FadeIn key={exp.id} delay={((idx % 3) + 1) * 100} className="h-full">
+                  <div className="bg-surface-container-lowest p-6 rounded-xl border border-surface-container shadow-xs hover:border-emerald-300 transition-all flex flex-col justify-between h-full">
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs text-emerald-700 font-bold uppercase tracking-wider">{exp.id}</span>
+                          <span className="px-1.5 py-0.5 bg-surface-container text-on-surface-variant font-mono text-[10px] rounded uppercase font-semibold">
+                            {exp.version}
+                          </span>
+                        </div>
+                        {exp.status === 'published' ? (
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono text-[10px] uppercase font-bold">
+                            Published
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-mono text-[10px] uppercase font-bold">
+                            Draft
+                          </span>
+                        )}
                       </div>
-                      {exp.status === 'published' ? (
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono text-[10px] uppercase font-bold">
-                          Published
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-mono text-[10px] uppercase font-bold">
-                          Draft
-                        </span>
-                      )}
-                    </div>
-                    <h3 className="font-heading font-bold text-on-surface text-base mb-1">{exp.title}</h3>
-                    <p className="text-xs text-on-surface-variant font-mono mb-4">{exp.paradigm} • {exp.engine}</p>
+                      <h3 className="font-heading font-bold text-on-surface text-base mb-1">{exp.title}</h3>
+                      <p className="text-xs text-on-surface-variant font-mono mb-4">{exp.paradigm} • {exp.engine}</p>
 
-                    <div className="bg-surface-container-low p-3 rounded-lg mb-4 text-xs font-mono">
-                      <div className="flex justify-between mb-1">
-                        <span className="text-on-surface-variant">Mean RT:</span>
-                        <span className="font-bold text-on-surface">{exp.meanRt}</span>
+                      <div className="bg-surface-container-low p-3 rounded-lg mb-4 text-xs font-mono">
+                        <div className="flex justify-between mb-1">
+                          <span className="text-on-surface-variant">Mean RT:</span>
+                          <span className="font-bold text-on-surface">{exp.meanRt}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-on-surface-variant">Participants:</span>
+                          <span className="font-bold text-on-surface">{exp.participants} / {exp.quota || '—'}</span>
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-on-surface-variant">Participants:</span>
-                        <span className="font-bold text-on-surface">{exp.participants} / {exp.quota || '—'}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-3 border-t border-surface-container text-xs font-mono">
+                      <span className="text-on-surface-variant text-[11px]">{exp.activity}</span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => navigate('/builder')}
+                          className="px-2.5 py-1 bg-surface-container hover:bg-surface-container-high rounded"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => navigate(exp.status === 'published' ? '/results' : '/runner')}
+                          className="px-2.5 py-1 bg-primary text-white font-bold rounded"
+                        >
+                          {exp.status === 'published' ? 'Results' : 'Test'}
+                        </button>
                       </div>
                     </div>
                   </div>
-
-                  <div className="flex items-center justify-between pt-3 border-t border-surface-container text-xs font-mono">
-                    <span className="text-on-surface-variant text-[11px]">{exp.activity}</span>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => navigate('/builder')}
-                        className="px-2.5 py-1 bg-surface-container hover:bg-surface-container-high rounded"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => navigate(exp.status === 'published' ? '/results' : '/runner')}
-                        className="px-2.5 py-1 bg-primary text-white font-bold rounded"
-                      >
-                        {exp.status === 'published' ? 'Results' : 'Test'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                </FadeIn>
               ))}
             </div>
           )}

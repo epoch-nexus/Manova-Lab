@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import FadeIn from '../components/FadeIn';
 
 export default function AuthPage() {
   const navigate = useNavigate();
@@ -83,38 +84,41 @@ export default function AuthPage() {
       <main className="flex-1 w-full flex flex-col items-center justify-center px-4 sm:px-8 py-10 max-w-7xl mx-auto">
         <div className="w-full flex flex-col gap-8">
           {/* Active Terminal Node Banner */}
-          <div className="w-full bg-surface-container-low p-4 rounded-xl border border-surface-container shadow-xs flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3 text-xs font-mono">
-              <span className="flex h-2 w-2 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
-              </span>
-              <span className="uppercase tracking-wider text-on-surface-variant">Active Hardware Node:</span>
-              <span className="font-semibold text-on-surface">Terminal ID #884-PX (Stanford Medical BioX Enclave)</span>
-              <span className="hidden md:inline-block text-surface-container-highest">|</span>
-              {activeSession ? (
-                <div className="flex items-center gap-1.5 text-on-surface">
-                  <span className="material-symbols-outlined text-[16px] text-emerald-600">account_circle</span>
-                  <span>dr.arun@stanford.edu</span>
-                  <span className="bg-surface-container-high text-emerald-700 font-bold px-1.5 py-0.2 rounded text-[10px] uppercase">PI Privilege</span>
-                </div>
-              ) : (
-                <span className="text-amber-600 font-bold uppercase">No Active Session</span>
-              )}
-            </div>
+          <FadeIn>
+            <div className="w-full bg-surface-container-low p-4 rounded-xl border border-surface-container shadow-xs flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3 text-xs font-mono">
+                <span className="flex h-2 w-2 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
+                </span>
+                <span className="uppercase tracking-wider text-on-surface-variant">Active Hardware Node:</span>
+                <span className="font-semibold text-on-surface">Terminal ID #884-PX (Stanford Medical BioX Enclave)</span>
+                <span className="hidden md:inline-block text-surface-container-highest">|</span>
+                {activeSession ? (
+                  <div className="flex items-center gap-1.5 text-on-surface">
+                    <span className="material-symbols-outlined text-[16px] text-emerald-600">account_circle</span>
+                    <span>dr.arun@stanford.edu</span>
+                    <span className="bg-surface-container-high text-emerald-700 font-bold px-1.5 py-0.2 rounded text-[10px] uppercase">PI Privilege</span>
+                  </div>
+                ) : (
+                  <span className="text-amber-600 font-bold uppercase">No Active Session</span>
+                )}
+              </div>
 
-            <button
-              onClick={() => setActiveSession(!activeSession)}
-              className="bg-surface-container-highest hover:bg-surface-container text-on-surface font-mono text-xs uppercase px-3 py-1.5 rounded transition-colors flex items-center gap-1.5"
-            >
-              <span className="material-symbols-outlined text-[14px]">logout</span>
-              <span>{activeSession ? 'Terminate Active Session' : 'Reconnect Session'}</span>
-            </button>
-          </div>
+              <button
+                onClick={() => setActiveSession(!activeSession)}
+                className="bg-surface-container-highest hover:bg-surface-container text-on-surface font-mono text-xs uppercase px-3 py-1.5 rounded transition-colors flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[14px]">logout</span>
+                <span>{activeSession ? 'Terminate Active Session' : 'Reconnect Session'}</span>
+              </button>
+            </div>
+          </FadeIn>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             {/* Researcher Console Form (Col 7) */}
-            <section className="lg:col-span-7 bg-surface-container-lowest rounded-2xl border border-surface-container shadow-xs flex flex-col overflow-hidden">
+            <FadeIn delay={100} className="lg:col-span-7">
+              <section className="bg-surface-container-lowest rounded-2xl border border-surface-container shadow-xs flex flex-col overflow-hidden">
               <div className="p-6 bg-surface-container-low border-b border-surface-container flex flex-col gap-2">
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-xs text-primary uppercase tracking-widest font-semibold flex items-center gap-1.5">
@@ -321,9 +325,11 @@ export default function AuthPage() {
                 )}
               </div>
             </section>
+          </FadeIn>
 
-            {/* Subject Participation Portal (Col 5) */}
-            <section className="lg:col-span-5 flex flex-col gap-6">
+          {/* Subject Participation Portal (Col 5) */}
+          <div className="lg:col-span-5 flex flex-col gap-6">
+            <FadeIn delay={200}>
               <div className="bg-surface-container-lowest rounded-2xl border border-surface-container shadow-xs flex flex-col overflow-hidden">
                 <div className="h-1.5 w-full bg-emerald-500"></div>
                 <div className="p-6 flex flex-col gap-4">
@@ -396,8 +402,10 @@ export default function AuthPage() {
                   </form>
                 </div>
               </div>
+            </FadeIn>
 
-              {/* Live Synchronization Pool Mini-Widget */}
+            {/* Live Synchronization Pool Mini-Widget */}
+            <FadeIn delay={300}>
               <div className="bg-surface-container-lowest rounded-2xl border border-surface-container p-5 shadow-xs flex flex-col gap-3 font-mono text-xs">
                 <div className="flex items-center justify-between text-on-surface-variant">
                   <span className="uppercase tracking-widest font-semibold flex items-center gap-1.5 text-on-surface">
@@ -423,7 +431,8 @@ export default function AuthPage() {
                   <span>Bandwidth: <strong className="text-on-surface">1.2 GB/s</strong></span>
                 </div>
               </div>
-            </section>
+            </FadeIn>
+          </div>
           </div>
         </div>
       </main>

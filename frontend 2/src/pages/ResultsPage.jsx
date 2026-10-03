@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
+import FadeIn from '../components/FadeIn';
 
 export default function ResultsPage() {
   const [toastMessage, setToastMessage] = useState(null);
@@ -129,7 +130,7 @@ export default function ResultsPage() {
       {/* Main Analytics Container */}
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-8 py-8 flex flex-col gap-8">
         {/* Title & Toolbar */}
-        <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-6 pb-2">
+        <FadeIn className="flex flex-col xl:flex-row xl:items-end justify-between gap-6 pb-2">
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center gap-2 text-primary font-mono text-xs uppercase tracking-wider font-bold">
               <span className="material-symbols-outlined text-[18px]">analytics</span>
@@ -162,239 +163,251 @@ export default function ResultsPage() {
               <span>Export Results (CSV)</span>
             </button>
           </div>
-        </div>
+        </FadeIn>
 
         {/* 4 Stat Metric Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Stat 1 */}
-          <div className="bg-surface-container-lowest p-5 rounded-xl border border-surface-container shadow-xs flex flex-col justify-between">
-            <div className="flex items-center justify-between pb-2">
-              <span className="font-mono text-xs uppercase tracking-wider text-on-surface-variant font-semibold">Cohort Enrolled</span>
-              <span className="material-symbols-outlined text-primary text-[20px]">badge</span>
-            </div>
-            <div>
-              <div className="flex items-baseline gap-2">
-                <span className="font-mono text-3xl font-extrabold text-on-surface">840</span>
-                <span className="font-mono text-xs text-on-surface-variant uppercase font-semibold">Subjects</span>
+          <FadeIn delay={100} className="h-full">
+            <div className="bg-surface-container-lowest p-5 rounded-xl border border-surface-container shadow-xs flex flex-col justify-between h-full">
+              <div className="flex items-center justify-between pb-2">
+                <span className="font-mono text-xs uppercase tracking-wider text-on-surface-variant font-semibold">Cohort Enrolled</span>
+                <span className="material-symbols-outlined text-primary text-[20px]">badge</span>
               </div>
-              <div className="flex items-center gap-1.5 mt-2 font-mono text-xs text-on-surface-variant">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                <span>812 completed • 28 in-flight</span>
+              <div>
+                <div className="flex items-baseline gap-2">
+                  <span className="font-mono text-3xl font-extrabold text-on-surface">840</span>
+                  <span className="font-mono text-xs text-on-surface-variant uppercase font-semibold">Subjects</span>
+                </div>
+                <div className="flex items-center gap-1.5 mt-2 font-mono text-xs text-on-surface-variant">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                  <span>812 completed • 28 in-flight</span>
+                </div>
+              </div>
+              <div className="mt-4 pt-2 border-t border-surface-container flex items-center justify-between font-mono text-xs">
+                <span className="text-on-surface-variant">Retention</span>
+                <span className="text-emerald-700 font-bold">96.7%</span>
               </div>
             </div>
-            <div className="mt-4 pt-2 border-t border-surface-container flex items-center justify-between font-mono text-xs">
-              <span className="text-on-surface-variant">Retention</span>
-              <span className="text-emerald-700 font-bold">96.7%</span>
-            </div>
-          </div>
+          </FadeIn>
 
           {/* Stat 2 */}
-          <div className="bg-surface-container-lowest p-5 rounded-xl border border-surface-container shadow-xs flex flex-col justify-between">
-            <div className="flex items-center justify-between pb-2">
-              <span className="font-mono text-xs uppercase tracking-wider text-on-surface-variant font-semibold">Telemetry Samples</span>
-              <span className="material-symbols-outlined text-primary text-[20px]">multiline_chart</span>
-            </div>
-            <div>
-              <div className="flex items-baseline gap-2">
-                <span className="font-mono text-3xl font-extrabold text-on-surface">40,320</span>
-                <span className="font-mono text-xs text-on-surface-variant uppercase font-semibold">Trials</span>
+          <FadeIn delay={200} className="h-full">
+            <div className="bg-surface-container-lowest p-5 rounded-xl border border-surface-container shadow-xs flex flex-col justify-between h-full">
+              <div className="flex items-center justify-between pb-2">
+                <span className="font-mono text-xs uppercase tracking-wider text-on-surface-variant font-semibold">Telemetry Samples</span>
+                <span className="material-symbols-outlined text-primary text-[20px]">multiline_chart</span>
               </div>
-              <div className="flex items-center gap-1.5 mt-2 font-mono text-xs text-on-surface-variant">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                <span>100% Fidelity (0 dropped frames)</span>
+              <div>
+                <div className="flex items-baseline gap-2">
+                  <span className="font-mono text-3xl font-extrabold text-on-surface">40,320</span>
+                  <span className="font-mono text-xs text-on-surface-variant uppercase font-semibold">Trials</span>
+                </div>
+                <div className="flex items-center gap-1.5 mt-2 font-mono text-xs text-on-surface-variant">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                  <span>100% Fidelity (0 dropped frames)</span>
+                </div>
+              </div>
+              <div className="mt-4 pt-2 border-t border-surface-container flex items-center justify-between font-mono text-xs">
+                <span className="text-on-surface-variant">Sampling Clock</span>
+                <span className="text-emerald-700 font-bold">1,000 Hz Sub-ms</span>
               </div>
             </div>
-            <div className="mt-4 pt-2 border-t border-surface-container flex items-center justify-between font-mono text-xs">
-              <span className="text-on-surface-variant">Sampling Clock</span>
-              <span className="text-emerald-700 font-bold">1,000 Hz Sub-ms</span>
-            </div>
-          </div>
+          </FadeIn>
 
           {/* Stat 3 */}
-          <div className="bg-surface-container-lowest p-5 rounded-xl border border-surface-container shadow-xs flex flex-col justify-between">
-            <div className="flex items-center justify-between pb-2">
-              <span className="font-mono text-xs uppercase tracking-wider text-on-surface-variant font-semibold">Mean RT</span>
-              <span className="material-symbols-outlined text-primary text-[20px]">timer</span>
-            </div>
-            <div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="font-mono text-3xl font-extrabold text-on-surface">342.1</span>
-                <span className="font-mono text-sm text-primary font-bold">ms</span>
-                <span className="text-xs text-on-surface-variant ml-1 font-mono">±18.4ms SD</span>
+          <FadeIn delay={300} className="h-full">
+            <div className="bg-surface-container-lowest p-5 rounded-xl border border-surface-container shadow-xs flex flex-col justify-between h-full">
+              <div className="flex items-center justify-between pb-2">
+                <span className="font-mono text-xs uppercase tracking-wider text-on-surface-variant font-semibold">Mean RT</span>
+                <span className="material-symbols-outlined text-primary text-[20px]">timer</span>
               </div>
-              <div className="flex items-center gap-2 mt-2 font-mono text-xs text-on-surface-variant">
-                <span>Cong: <strong className="text-on-surface">312.4ms</strong></span>
-                <span>|</span>
-                <span>Incong: <strong className="text-on-surface">371.8ms</strong></span>
+              <div>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="font-mono text-3xl font-extrabold text-on-surface">342.1</span>
+                  <span className="font-mono text-sm text-primary font-bold">ms</span>
+                  <span className="text-xs text-on-surface-variant ml-1 font-mono">±18.4ms SD</span>
+                </div>
+                <div className="flex items-center gap-2 mt-2 font-mono text-xs text-on-surface-variant">
+                  <span>Cong: <strong className="text-on-surface">312.4ms</strong></span>
+                  <span>|</span>
+                  <span>Incong: <strong className="text-on-surface">371.8ms</strong></span>
+                </div>
+              </div>
+              <div className="mt-4 pt-2 border-t border-surface-container flex items-center justify-between font-mono text-xs">
+                <span className="text-on-surface-variant">Inhibition Cost</span>
+                <span className="text-emerald-700 font-bold">+59.4 ms Delta</span>
               </div>
             </div>
-            <div className="mt-4 pt-2 border-t border-surface-container flex items-center justify-between font-mono text-xs">
-              <span className="text-on-surface-variant">Inhibition Cost</span>
-              <span className="text-emerald-700 font-bold">+59.4 ms Delta</span>
-            </div>
-          </div>
+          </FadeIn>
 
           {/* Stat 4 */}
-          <div className="bg-surface-container-lowest p-5 rounded-xl border border-surface-container shadow-xs flex flex-col justify-between">
-            <div className="flex items-center justify-between pb-2">
-              <span className="font-mono text-xs uppercase tracking-wider text-on-surface-variant font-semibold">Detection Accuracy</span>
-              <span className="material-symbols-outlined text-primary text-[20px]">verified</span>
-            </div>
-            <div>
-              <div className="flex items-baseline gap-2">
-                <span className="font-mono text-3xl font-extrabold text-on-surface">96.4%</span>
-                <span className="font-mono text-xs text-emerald-700 font-bold">d' = 3.42</span>
+          <FadeIn delay={400} className="h-full">
+            <div className="bg-surface-container-lowest p-5 rounded-xl border border-surface-container shadow-xs flex flex-col justify-between h-full">
+              <div className="flex items-center justify-between pb-2">
+                <span className="font-mono text-xs uppercase tracking-wider text-on-surface-variant font-semibold">Detection Accuracy</span>
+                <span className="material-symbols-outlined text-primary text-[20px]">verified</span>
               </div>
-              <div className="flex items-center gap-2 mt-2 font-mono text-xs text-on-surface-variant">
-                <span>Cong: <strong className="text-on-surface">98.8%</strong></span>
-                <span>|</span>
-                <span>Incong: <strong className="text-on-surface">94.0%</strong></span>
+              <div>
+                <div className="flex items-baseline gap-2">
+                  <span className="font-mono text-3xl font-extrabold text-on-surface">96.4%</span>
+                  <span className="font-mono text-xs text-emerald-700 font-bold">d' = 3.42</span>
+                </div>
+                <div className="flex items-center gap-2 mt-2 font-mono text-xs text-on-surface-variant">
+                  <span>Cong: <strong className="text-on-surface">98.8%</strong></span>
+                  <span>|</span>
+                  <span>Incong: <strong className="text-on-surface">94.0%</strong></span>
+                </div>
+              </div>
+              <div className="mt-4 pt-2 border-t border-surface-container flex items-center justify-between font-mono text-xs">
+                <span className="text-on-surface-variant">Criterion Beta</span>
+                <span className="text-emerald-700 font-bold">0.08 Neutral Bias</span>
               </div>
             </div>
-            <div className="mt-4 pt-2 border-t border-surface-container flex items-center justify-between font-mono text-xs">
-              <span className="text-on-surface-variant">Criterion Beta</span>
-              <span className="text-emerald-700 font-bold">0.08 Neutral Bias</span>
-            </div>
-          </div>
+          </FadeIn>
         </div>
 
         {/* Reaction Time Distribution Gaussian Curve */}
-        <div className="bg-surface-container-lowest p-6 rounded-2xl border border-surface-container shadow-xs flex flex-col gap-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-surface-container gap-3">
-            <div>
-              <span className="font-mono text-xs uppercase text-on-surface-variant font-semibold">RT DENSITY DISTRIBUTIONS</span>
-              <h2 className="font-heading font-bold text-lg text-on-surface">
-                Congruent vs. Incongruent Response Latencies
-              </h2>
-            </div>
-            <div className="flex items-center gap-4 font-mono text-xs">
-              <div className="flex items-center gap-1.5">
-                <span className="w-3 h-1.5 rounded bg-emerald-500"></span>
-                <span>Congruent (μ = 312ms)</span>
+        <FadeIn delay={100}>
+          <div className="bg-surface-container-lowest p-6 rounded-2xl border border-surface-container shadow-xs flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-surface-container gap-3">
+              <div>
+                <span className="font-mono text-xs uppercase text-on-surface-variant font-semibold">RT DENSITY DISTRIBUTIONS</span>
+                <h2 className="font-heading font-bold text-lg text-on-surface">
+                  Congruent vs. Incongruent Response Latencies
+                </h2>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-3 h-1.5 rounded bg-slate-500"></span>
-                <span>Incongruent (μ = 371ms)</span>
+              <div className="flex items-center gap-4 font-mono text-xs">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-1.5 rounded bg-emerald-500"></span>
+                  <span>Congruent (μ = 312ms)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-1.5 rounded bg-slate-500"></span>
+                  <span>Incongruent (μ = 371ms)</span>
+                </div>
               </div>
             </div>
+
+            <div className="w-full h-64 bg-slate-950 rounded-xl p-4 relative border border-slate-800">
+              <svg className="w-full h-full" viewBox="0 0 1000 240" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="congruentGrad" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stopColor="#10B981" stopOpacity="0.32" />
+                    <stop offset="100%" stopColor="#10B981" stopOpacity="0.0" />
+                  </linearGradient>
+                  <linearGradient id="incongruentGrad" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stopColor="#64748b" stopOpacity="0.25" />
+                    <stop offset="100%" stopColor="#64748b" stopOpacity="0.0" />
+                  </linearGradient>
+                </defs>
+
+                {/* Grid Lines */}
+                <line x1="60" y1="200" x2="940" y2="200" stroke="#334155" strokeWidth="1" />
+                <line x1="60" y1="130" x2="940" y2="130" stroke="#1e293b" strokeDasharray="3 3" />
+                <line x1="60" y1="60" x2="940" y2="60" stroke="#1e293b" strokeDasharray="3 3" />
+
+                {/* Congruent Curve */}
+                <path
+                  d="M 120 200 C 200 200, 260 190, 310 110 C 340 50, 355 20, 360 18 C 365 20, 385 60, 415 120 C 455 180, 520 200, 600 200 Z"
+                  fill="url(#congruentGrad)"
+                />
+                <path
+                  d="M 120 200 C 200 200, 260 190, 310 110 C 340 50, 355 20, 360 18 C 365 20, 385 60, 415 120 C 455 180, 520 200, 600 200"
+                  stroke="#10B981"
+                  strokeWidth="2.5"
+                  fill="none"
+                />
+
+                {/* Incongruent Curve */}
+                <path
+                  d="M 180 200 C 260 200, 340 190, 400 130 C 440 70, 455 45, 460 42 C 470 45, 500 80, 540 140 C 600 190, 700 200, 800 200 Z"
+                  fill="url(#incongruentGrad)"
+                />
+                <path
+                  d="M 180 200 C 260 200, 340 190, 400 130 C 440 70, 455 45, 460 42 C 470 45, 500 80, 540 140 C 600 190, 700 200, 800 200"
+                  stroke="#94a3b8"
+                  strokeWidth="2.5"
+                  fill="none"
+                />
+              </svg>
+            </div>
+            <div className="flex justify-between text-xs font-mono text-on-surface-variant px-2">
+              <span>150ms</span>
+              <span>250ms</span>
+              <span>350ms (Mean Congruent)</span>
+              <span>450ms (Mean Incongruent)</span>
+              <span>550ms</span>
+              <span>650ms</span>
+            </div>
           </div>
-
-          <div className="w-full h-64 bg-slate-950 rounded-xl p-4 relative border border-slate-800">
-            <svg className="w-full h-full" viewBox="0 0 1000 240" preserveAspectRatio="none">
-              <defs>
-                <linearGradient id="congruentGrad" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="0%" stopColor="#10B981" stopOpacity="0.32" />
-                  <stop offset="100%" stopColor="#10B981" stopOpacity="0.0" />
-                </linearGradient>
-                <linearGradient id="incongruentGrad" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="0%" stopColor="#64748b" stopOpacity="0.25" />
-                  <stop offset="100%" stopColor="#64748b" stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
-
-              {/* Grid Lines */}
-              <line x1="60" y1="200" x2="940" y2="200" stroke="#334155" strokeWidth="1" />
-              <line x1="60" y1="130" x2="940" y2="130" stroke="#1e293b" strokeDasharray="3 3" />
-              <line x1="60" y1="60" x2="940" y2="60" stroke="#1e293b" strokeDasharray="3 3" />
-
-              {/* Congruent Curve */}
-              <path
-                d="M 120 200 C 200 200, 260 190, 310 110 C 340 50, 355 20, 360 18 C 365 20, 385 60, 415 120 C 455 180, 520 200, 600 200 Z"
-                fill="url(#congruentGrad)"
-              />
-              <path
-                d="M 120 200 C 200 200, 260 190, 310 110 C 340 50, 355 20, 360 18 C 365 20, 385 60, 415 120 C 455 180, 520 200, 600 200"
-                stroke="#10B981"
-                strokeWidth="2.5"
-                fill="none"
-              />
-
-              {/* Incongruent Curve */}
-              <path
-                d="M 180 200 C 260 200, 340 190, 400 130 C 440 70, 455 45, 460 42 C 470 45, 500 80, 540 140 C 600 190, 700 200, 800 200 Z"
-                fill="url(#incongruentGrad)"
-              />
-              <path
-                d="M 180 200 C 260 200, 340 190, 400 130 C 440 70, 455 45, 460 42 C 470 45, 500 80, 540 140 C 600 190, 700 200, 800 200"
-                stroke="#94a3b8"
-                strokeWidth="2.5"
-                fill="none"
-              />
-            </svg>
-          </div>
-          <div className="flex justify-between text-xs font-mono text-on-surface-variant px-2">
-            <span>150ms</span>
-            <span>250ms</span>
-            <span>350ms (Mean Congruent)</span>
-            <span>450ms (Mean Incongruent)</span>
-            <span>550ms</span>
-            <span>650ms</span>
-          </div>
-        </div>
+        </FadeIn>
 
         {/* Participant Ledger Table */}
-        <div className="bg-surface-container-lowest rounded-2xl border border-surface-container shadow-xs overflow-hidden">
-          <div className="p-4 bg-surface-container-low border-b border-surface-container flex items-center justify-between">
-            <span className="font-mono text-xs uppercase text-on-surface font-bold tracking-wider">
-              Participant Session Ledger (Sample 6 of 840)
-            </span>
-            <span className="font-mono text-xs text-on-surface-variant">Live PTP Verified</span>
-          </div>
+        <FadeIn delay={200}>
+          <div className="bg-surface-container-lowest rounded-2xl border border-surface-container shadow-xs overflow-hidden">
+            <div className="p-4 bg-surface-container-low border-b border-surface-container flex items-center justify-between">
+              <span className="font-mono text-xs uppercase text-on-surface font-bold tracking-wider">
+                Participant Session Ledger (Sample 6 of 840)
+              </span>
+              <span className="font-mono text-xs text-on-surface-variant">Live PTP Verified</span>
+            </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left font-mono text-xs">
-              <thead className="bg-surface-container text-on-surface-variant uppercase text-[11px] border-b border-surface-container">
-                <tr>
-                  <th className="p-3 pl-5">Session Hash</th>
-                  <th className="p-3">Status</th>
-                  <th className="p-3">Trials Done</th>
-                  <th className="p-3">Mean Cong RT</th>
-                  <th className="p-3">Mean Incong RT</th>
-                  <th className="p-3">Delta</th>
-                  <th className="p-3">Accuracy</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-surface-container text-on-surface">
-                <tr className="hover:bg-surface-container-low transition-colors">
-                  <td className="p-3 pl-5 font-bold text-primary">#SUB-9402a</td>
-                  <td className="p-3"><span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 font-bold">COMPLETED</span></td>
-                  <td className="p-3">48 / 48</td>
-                  <td className="p-3">308.2 ms</td>
-                  <td className="p-3">364.5 ms</td>
-                  <td className="p-3 text-emerald-600 font-bold">+56.3 ms</td>
-                  <td className="p-3 font-bold">98%</td>
-                </tr>
-                <tr className="hover:bg-surface-container-low transition-colors">
-                  <td className="p-3 pl-5 font-bold text-primary">#SUB-8192b</td>
-                  <td className="p-3"><span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 font-bold">COMPLETED</span></td>
-                  <td className="p-3">48 / 48</td>
-                  <td className="p-3">324.0 ms</td>
-                  <td className="p-3">389.1 ms</td>
-                  <td className="p-3 text-emerald-600 font-bold">+65.1 ms</td>
-                  <td className="p-3 font-bold">95.8%</td>
-                </tr>
-                <tr className="hover:bg-surface-container-low transition-colors">
-                  <td className="p-3 pl-5 font-bold text-primary">#SUB-1049c</td>
-                  <td className="p-3"><span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 font-bold">COMPLETED</span></td>
-                  <td className="p-3">48 / 48</td>
-                  <td className="p-3">295.4 ms</td>
-                  <td className="p-3">348.0 ms</td>
-                  <td className="p-3 text-emerald-600 font-bold">+52.6 ms</td>
-                  <td className="p-3 font-bold">100%</td>
-                </tr>
-                <tr className="hover:bg-surface-container-low transition-colors">
-                  <td className="p-3 pl-5 font-bold text-primary">#SUB-5592d</td>
-                  <td className="p-3"><span className="px-2 py-0.5 rounded bg-amber-50 text-amber-800 font-bold">IN-FLIGHT</span></td>
-                  <td className="p-3">34 / 48</td>
-                  <td className="p-3">315.8 ms</td>
-                  <td className="p-3">378.2 ms</td>
-                  <td className="p-3 text-emerald-600 font-bold">+62.4 ms</td>
-                  <td className="p-3 font-bold">94.1%</td>
-                </tr>
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left font-mono text-xs">
+                <thead className="bg-surface-container text-on-surface-variant uppercase text-[11px] border-b border-surface-container">
+                  <tr>
+                    <th className="p-3 pl-5">Session Hash</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3">Trials Done</th>
+                    <th className="p-3">Mean Cong RT</th>
+                    <th className="p-3">Mean Incong RT</th>
+                    <th className="p-3">Delta</th>
+                    <th className="p-3">Accuracy</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-surface-container text-on-surface">
+                  <tr className="hover:bg-surface-container-low transition-colors">
+                    <td className="p-3 pl-5 font-bold text-primary">#SUB-9402a</td>
+                    <td className="p-3"><span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 font-bold">COMPLETED</span></td>
+                    <td className="p-3">48 / 48</td>
+                    <td className="p-3">308.2 ms</td>
+                    <td className="p-3">364.5 ms</td>
+                    <td className="p-3 text-emerald-600 font-bold">+56.3 ms</td>
+                    <td className="p-3 font-bold">98%</td>
+                  </tr>
+                  <tr className="hover:bg-surface-container-low transition-colors">
+                    <td className="p-3 pl-5 font-bold text-primary">#SUB-8192b</td>
+                    <td className="p-3"><span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 font-bold">COMPLETED</span></td>
+                    <td className="p-3">48 / 48</td>
+                    <td className="p-3">324.0 ms</td>
+                    <td className="p-3">389.1 ms</td>
+                    <td className="p-3 text-emerald-600 font-bold">+65.1 ms</td>
+                    <td className="p-3 font-bold">95.8%</td>
+                  </tr>
+                  <tr className="hover:bg-surface-container-low transition-colors">
+                    <td className="p-3 pl-5 font-bold text-primary">#SUB-1049c</td>
+                    <td className="p-3"><span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 font-bold">COMPLETED</span></td>
+                    <td className="p-3">48 / 48</td>
+                    <td className="p-3">295.4 ms</td>
+                    <td className="p-3">348.0 ms</td>
+                    <td className="p-3 text-emerald-600 font-bold">+52.6 ms</td>
+                    <td className="p-3 font-bold">100%</td>
+                  </tr>
+                  <tr className="hover:bg-surface-container-low transition-colors">
+                    <td className="p-3 pl-5 font-bold text-primary">#SUB-5592d</td>
+                    <td className="p-3"><span className="px-2 py-0.5 rounded bg-amber-50 text-amber-800 font-bold">IN-FLIGHT</span></td>
+                    <td className="p-3">34 / 48</td>
+                    <td className="p-3">315.8 ms</td>
+                    <td className="p-3">378.2 ms</td>
+                    <td className="p-3 text-emerald-600 font-bold">+62.4 ms</td>
+                    <td className="p-3 font-bold">94.1%</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        </FadeIn>
       </main>
 
       <footer className="w-full bg-surface-container-low border-t border-surface-container py-3 px-4 sm:px-8">
