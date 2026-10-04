@@ -1,141 +1,165 @@
 import React, { useEffect, useRef } from 'react';
 
-// Live simulation parameters
-const NUM_POINTS = 50;
-const WIDTH = 600;
-const BASELINE_EEG = 40;
-const BASELINE_GAZE = 45;
-const DX = WIDTH / (NUM_POINTS - 1);
+// ── Coordinate space: viewBox 0 0 1000 200, baseline centred at y=100 ──
+const BASELINE = 100;
+const TILE_W   = 1000;
+const DOT_X    = 980;   // 20px inside the right edge so r=9 halo stays within the card
 
-// Linear interpolation helper
-const lerp = (current, target, factor = 0.05) => current + (target - current) * factor;
+// 12 varied spike clusters across 1000 px  (rescaled from original 600-wide)
+const EKG_VERTICES = [
+  { x: 0,    y: 100 },
 
-// Smooth cubic bezier spline generator (Catmull-Rom to Cubic Bezier conversion)
-function pointsToSmoothPath(points) {
-  if (!points || points.length === 0) return '';
-  const n = points.length;
-  if (n === 1) return `M ${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`;
+  // Cluster 1 – single sharp peak
+  { x: 37,   y: 100 },
+  { x: 53,   y: 20  },
+  { x: 67,   y: 165 },
+  { x: 80,   y: 100 },
 
-  let d = `M ${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`;
+  // Cluster 2 – micro-deflect upward
+  { x: 103,  y: 100 },
+  { x: 113,  y: 75  },
+  { x: 123,  y: 100 },
 
-  for (let i = 0; i < n - 1; i++) {
-    const p0 = i > 0 ? points[i - 1] : { x: 2 * points[0].x - points[1].x, y: 2 * points[0].y - points[1].y };
-    const p1 = points[i];
-    const p2 = points[i + 1];
-    const p3 = i < n - 2 ? points[i + 2] : { x: 2 * points[n - 1].x - points[n - 2].x, y: 2 * points[n - 1].y - points[n - 2].y };
+  // Cluster 3 – double burst
+  { x: 150,  y: 100 },
+  { x: 167,  y: 15  },
+  { x: 183,  y: 170 },
+  { x: 200,  y: 50  },
+  { x: 213,  y: 140 },
+  { x: 227,  y: 100 },
 
-    const cp1x = p1.x + (p2.x - p0.x) / 6;
-    const cp1y = p1.y + (p2.y - p0.y) / 6;
-    const cp2x = p2.x - (p3.x - p1.x) / 6;
-    const cp2y = p2.y - (p3.y - p1.y) / 6;
+  // Cluster 4 – tall single peak
+  { x: 253,  y: 100 },
+  { x: 270,  y: 10  },
+  { x: 287,  y: 175 },
+  { x: 300,  y: 100 },
 
-    d += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
-  }
+  // Cluster 5 – micro-deflect downward
+  { x: 327,  y: 100 },
+  { x: 337,  y: 130 },
+  { x: 347,  y: 100 },
 
-  return d;
+  // Cluster 6 – double burst (asymmetric)
+  { x: 370,  y: 100 },
+  { x: 387,  y: 25  },
+  { x: 403,  y: 160 },
+  { x: 420,  y: 40  },
+  { x: 433,  y: 145 },
+  { x: 447,  y: 100 },
+
+  // Cluster 7 – medium single peak
+  { x: 470,  y: 100 },
+  { x: 487,  y: 30  },
+  { x: 500,  y: 158 },
+  { x: 513,  y: 100 },
+
+  // Cluster 8 – micro-deflect upward
+  { x: 537,  y: 100 },
+  { x: 547,  y: 70  },
+  { x: 557,  y: 100 },
+
+  // Cluster 9 – wide single peak
+  { x: 580,  y: 100 },
+  { x: 600,  y: 15  },
+  { x: 623,  y: 170 },
+  { x: 643,  y: 100 },
+
+  // Cluster 10 – double burst (tight)
+  { x: 667,  y: 100 },
+  { x: 680,  y: 20  },
+  { x: 693,  y: 165 },
+  { x: 707,  y: 35  },
+  { x: 717,  y: 150 },
+  { x: 730,  y: 100 },
+
+  // Cluster 11 – micro-deflect downward
+  { x: 753,  y: 100 },
+  { x: 763,  y: 135 },
+  { x: 773,  y: 100 },
+
+  // Cluster 12 – sharp closing peak
+  { x: 797,  y: 100 },
+  { x: 813,  y: 13  },
+  { x: 830,  y: 173 },
+  { x: 847,  y: 100 },
+
+  // flat run to tile boundary
+  { x: 1000, y: 100 },
+];
+
+// Build an SVG polyline path string from vertex array with an optional X offset
+function buildPath(verts, xOffset = 0) {
+  return verts
+    .map((v, i) => `${i === 0 ? 'M' : 'L'} ${v.x + xOffset} ${v.y}`)
+    .join(' ');
 }
 
-// Generate organic wave coordinates from phase t, frequencies, harmonics, and interpolated noise
-function generateWavePoints(t, base, a1, f1, a2, f2, a3, f3, noiseArr) {
-  const points = [];
-  for (let i = 0; i < NUM_POINTS; i++) {
-    const x = i * DX;
-    const noise = noiseArr ? noiseArr[i] : 0;
-    const y =
-      base +
-      a1 * Math.sin(x * f1 + t) +
-      a2 * Math.sin(x * f2 + t * 1.5) +
-      a3 * Math.sin(x * f3 - t * 0.8) +
-      noise;
-    points.push({ x, y });
+// Two-tile continuous stream: tile at x=0 and tile at x=TILE_W
+const TILE_0 = buildPath(EKG_VERTICES, 0);
+const TILE_1 = buildPath(EKG_VERTICES, TILE_W).replace(/^M/, 'L');
+const CONTINUOUS_STREAM_PATH = `${TILE_0} ${TILE_1}`;
+
+// ── Piecewise-linear Y evaluator (mathematical fallback) ─────────────────────
+// Returns the waveform Y at the screen's right edge given the current offset.
+function getEkgY(offset) {
+  const normU = ((offset % TILE_W) + TILE_W) % TILE_W;
+  for (let i = 0; i < EKG_VERTICES.length - 1; i++) {
+    const v1 = EKG_VERTICES[i];
+    const v2 = EKG_VERTICES[i + 1];
+    if (normU >= v1.x && normU <= v2.x) {
+      if (v2.x === v1.x) return v1.y;
+      const t = (normU - v1.x) / (v2.x - v1.x);
+      return v1.y + t * (v2.y - v1.y);
+    }
   }
-  return points;
+  return BASELINE;
 }
 
 export default function PipelineGraph({ trialCount = 1, measuredLatency = 218.4 }) {
-  // DOM element refs for direct high-performance GPU updates without React re-render churn
-  const eegPathRef = useRef(null);
-  const gazePathRef = useRef(null);
-  const tipRef = useRef(null);
-
-  // Phase variable t and noise state buffers
-  const tRef = useRef(0);
-  const noiseTickRef = useRef(0);
-  const erpTickRef = useRef(0);
-
-  const eegCurrentNoise = useRef(new Float32Array(NUM_POINTS));
-  const eegTargetNoise = useRef(new Float32Array(NUM_POINTS));
-  const gazeCurrentNoise = useRef(new Float32Array(NUM_POINTS));
-  const gazeTargetNoise = useRef(new Float32Array(NUM_POINTS));
-
-  // Compute initial static paths for SSR & immediate initial render
-  const initialEegPts = generateWavePoints(0, BASELINE_EEG, 5.2, 0.022, 3.1, 0.045, 1.6, 0.078, null);
-  const initialGazePts = generateWavePoints(0, BASELINE_GAZE, 4.8, 0.015, 2.4, 0.032, 1.2, 0.055, null);
-  const initialEegD = pointsToSmoothPath(initialEegPts);
-  const initialGazeD = pointsToSmoothPath(initialGazePts);
-  const initialTipY = initialEegPts[NUM_POINTS - 1].y;
+  const trackRef = useRef(null);
+  const dotRef   = useRef(null);
+  const pathRef  = useRef(null);
 
   useEffect(() => {
     let animId;
+    // ~63 px/s keeps the same visual scroll speed as the old 600-wide tile at 38 px/s
+    const speed = 63;
 
     const updateFrame = () => {
-      // 1. Shift continuous phase variable t smoothly inside requestAnimationFrame
-      tRef.current += 0.018;
-      const t = tRef.current;
+      const time   = performance.now() * 0.001;
+      const offset = (time * speed) % TILE_W;
 
-      const eegNoise = eegCurrentNoise.current;
-      const eegTarget = eegTargetNoise.current;
-      const gazeNoise = gazeCurrentNoise.current;
-      const gazeTarget = gazeTargetNoise.current;
-
-      // 2. Smoothly interpolate target random spikes and noise with lerp(current, target, 0.05)
-      for (let i = 0; i < NUM_POINTS; i++) {
-        eegNoise[i] = lerp(eegNoise[i], eegTarget[i], 0.05);
-        gazeNoise[i] = lerp(gazeNoise[i], gazeTarget[i], 0.05);
+      // 1. Scroll waveform track leftward
+      if (trackRef.current) {
+        trackRef.current.style.transform = `translate3d(-${offset.toFixed(2)}px, 0, 0)`;
       }
 
-      // 3. Periodic subtle organic target noise generation
-      noiseTickRef.current += 1;
-      if (noiseTickRef.current % 30 === 0) {
-        for (let i = 0; i < NUM_POINTS; i++) {
-          eegTarget[i] = (Math.random() - 0.5) * 3.5;
-          gazeTarget[i] = (Math.random() - 0.5) * 2.5;
+      // 2. Derive dot Y directly from the piecewise-linear waveform math.
+      //    This is evaluated at the exact same SVG X coordinate the dot sits at
+      //    (DOT_X + offset in path-local coords), with zero smoothing or lag.
+      if (dotRef.current) {
+        // Primary: exact piecewise-linear evaluation — zero lag, no DOM dependency
+        let tipY = getEkgY(DOT_X + offset);
+        if (isNaN(tipY) || tipY == null) tipY = BASELINE;
+
+        // Cross-check with DOM path when available (confirms math, catches rounding)
+        if (pathRef.current) {
+          try {
+            const targetX  = DOT_X + offset;
+            const totalLen = pathRef.current.getTotalLength();
+            let lo = 0, hi = totalLen;
+            for (let i = 0; i < 20; i++) {
+              const mid = (lo + hi) * 0.5;
+              const pt  = pathRef.current.getPointAtLength(mid);
+              if (pt.x < targetX) lo = mid; else hi = mid;
+            }
+            const found = pathRef.current.getPointAtLength((lo + hi) * 0.5);
+            if (!isNaN(found.y) && found.y != null) tipY = found.y;
+          } catch (_) { /* keep math result */ }
         }
-      }
 
-      // 4. Stimulus onset ERP wave packet (smooth N200 deflection and P300 rebound)
-      erpTickRef.current += 1;
-      if (erpTickRef.current > 160) {
-        erpTickRef.current = 0;
-        const center = Math.floor(NUM_POINTS * 0.72);
-        for (let offset = -5; offset <= 5; offset++) {
-          const idx = center + offset;
-          if (idx >= 0 && idx < NUM_POINTS) {
-            const gaussian = Math.exp(-(offset * offset) / 5);
-            const deflection = (offset < 0 ? -14 : 12) * gaussian;
-            eegTarget[idx] += deflection;
-          }
-        }
-      }
-
-      // 5. Generate smooth organic multi-frequency waves
-      const eegPts = generateWavePoints(t, BASELINE_EEG, 5.2, 0.022, 3.1, 0.045, 1.6, 0.078, eegNoise);
-      const gazePts = generateWavePoints(t * 0.85, BASELINE_GAZE, 4.8, 0.015, 2.4, 0.032, 1.2, 0.055, gazeNoise);
-
-      // 6. Build cubic bezier SVG path strings (C commands)
-      const eegD = pointsToSmoothPath(eegPts);
-      const gazeD = pointsToSmoothPath(gazePts);
-
-      // 7. Directly update SVG DOM attributes for stutter-free 60fps rendering
-      if (eegPathRef.current) {
-        eegPathRef.current.setAttribute('d', eegD);
-      }
-      if (gazePathRef.current) {
-        gazePathRef.current.setAttribute('d', gazeD);
-      }
-      if (tipRef.current) {
-        const tipY = eegPts[NUM_POINTS - 1].y;
-        tipRef.current.setAttribute('transform', `translate(${WIDTH}, ${tipY.toFixed(1)})`);
+        // Direct style write — no CSS transition, no lerp, no easing
+        dotRef.current.style.top = `${((tipY / 200) * 100).toFixed(2)}%`;
       }
 
       animId = requestAnimationFrame(updateFrame);
@@ -146,7 +170,7 @@ export default function PipelineGraph({ trialCount = 1, measuredLatency = 218.4 
   }, []);
 
   return (
-    <div className="bg-slate-900 rounded-[28px] sm:rounded-[32px] p-6 text-white font-mono text-xs border border-slate-800/90 relative shadow-2xl">
+    <div className="bg-slate-900 rounded-[28px] sm:rounded-[32px] p-6 text-white font-mono text-xs border border-slate-800/90 relative shadow-2xl will-change-transform transform-gpu">
       {/* Channel Header & Bus Status */}
       <div className="flex flex-wrap items-center justify-between mb-4 text-slate-400 gap-3">
         <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
@@ -169,8 +193,8 @@ export default function PipelineGraph({ trialCount = 1, measuredLatency = 218.4 
         </div>
       </div>
 
-      {/* Graph Visual Area with Softer ~3x Rounded Corners */}
-      <div className="bg-slate-950/85 rounded-[24px] p-5 border border-slate-800/80 shadow-inner relative overflow-hidden">
+      {/* Graph Visual Area — overflow:visible so dot + halo are never clipped */}
+      <div className="bg-slate-950/85 rounded-[24px] p-5 sm:p-6 border border-slate-800/80 shadow-inner relative overflow-hidden">
         {/* Ambient Grid overlay */}
         <div className="absolute inset-0 pointer-events-none opacity-20">
           <div className="w-full h-full grid grid-rows-4 grid-cols-6 divide-y divide-x divide-slate-800">
@@ -180,84 +204,66 @@ export default function PipelineGraph({ trialCount = 1, measuredLatency = 218.4 
           </div>
         </div>
 
-        <div className="h-28 w-full flex items-center justify-center relative">
+        {/* SVG canvas — overflow:visible + clear viewBox */}
+        <div className="h-32 sm:h-34 w-full flex items-center justify-center relative">
           <svg
-            className="w-full h-24 fill-none overflow-visible"
+            className="w-full h-full fill-none"
+            style={{ overflow: 'visible' }}
             preserveAspectRatio="none"
-            viewBox="0 0 600 80"
+            viewBox="0 0 1000 200"
           >
-            <defs>
-              <filter id="glow-emerald" x="-50%" y="-50%" width="200%" height="200%">
-                <feGaussianBlur stdDeviation="3.5" result="blur" />
-                <feMerge>
-                  <feMergeNode in="blur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
-            </defs>
-
-            {/* Channel 02: Gaze X (Sky Blue Dashed Line with non-scaling stroke) */}
-            <path
-              ref={gazePathRef}
-              d={initialGazeD}
-              stroke="#38bdf8"
-              strokeWidth="1.5"
-              strokeDasharray="4 3"
+            {/* Static dotted baseline reference */}
+            <line
+              x1="0" y1={BASELINE}
+              x2={TILE_W} y2={BASELINE}
+              stroke="#64748b"
+              strokeWidth="1.2"
+              strokeDasharray="4 4"
               opacity="0.45"
               vectorEffect="non-scaling-stroke"
             />
 
-            {/* Channel 01: Frontal N200 EEG (Emerald Solid Line with cubic bezier smoothness and non-scaling stroke) */}
-            <path
-              ref={eegPathRef}
-              d={initialEegD}
-              stroke="#34d399"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              vectorEffect="non-scaling-stroke"
-            />
-
-            {/* Smooth Gliding Glowing Pulsing Dot at Leading Tip */}
-            <g
-              ref={tipRef}
-              transform={`translate(${WIDTH}, ${initialTipY.toFixed(1)})`}
-            >
-              <circle
-                cx={0}
-                cy={0}
-                r={8}
-                className="fill-emerald-400 animate-ping"
-                opacity="0.65"
-              />
-              <circle
-                cx={0}
-                cy={0}
-                r={4.5}
-                className="fill-emerald-300"
-                filter="url(#glow-emerald)"
-              />
-              <circle
-                cx={0}
-                cy={0}
-                r={2}
-                className="fill-white"
+            {/* Animated two-tile waveform track */}
+            <g ref={trackRef} className="will-change-transform">
+              <path
+                ref={pathRef}
+                d={CONTINUOUS_STREAM_PATH}
+                stroke="#34d399"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+                strokeLinejoin="miter"
+                strokeMiterlimit="10"
+                fill="none"
+                vectorEffect="non-scaling-stroke"
               />
             </g>
           </svg>
+
+          {/* Trailing dot — positioned at left: DOT_X/1000 so X aligns
+              exactly with the SVG coordinate used for Y lookup.
+              No CSS transition — moves frame-perfect with the waveform. */}
+          <div
+            ref={dotRef}
+            className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20"
+            style={{ left: `${(DOT_X / 1000) * 100}%`, top: '50%' }}
+          >
+            <div className="relative flex items-center justify-center w-5 h-5">
+              <div className="absolute inset-0 rounded-full bg-emerald-400/35 animate-ping" />
+              <div className="w-3 h-3 rounded-full bg-emerald-400 border-2 border-emerald-200 shadow-[0_0_8px_#34d399]" />
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Bottom Telemetry Metrics Strip with Matching Softer Curvature */}
+      {/* Bottom Telemetry Metrics Strip */}
       <div className="mt-4 bg-slate-950/40 rounded-[22px] px-5 py-3 border border-slate-800/60 flex flex-wrap items-center justify-between text-slate-400 gap-3">
-        <div className="flex items-center gap-3 sm:gap-5 flex-wrap text-xs">
-          <span className="text-emerald-400 font-bold flex items-center gap-1.5">
-            <span className="text-[10px]">▲</span> STIMULUS ONSET #{410 + trialCount}
+        <div className="flex items-center gap-2.5 text-xs">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span className="text-emerald-400 font-semibold uppercase tracking-wider text-[11px]">
+            TELEMETRY STREAM ACTIVE
           </span>
-          <span>
-            Response: <strong className="text-white font-mono">{measuredLatency}ms</strong>
-          </span>
-          <span className="text-emerald-300 font-medium">Accuracy: 100% (Hit)</span>
+          <span className="text-slate-600">|</span>
+          <span className="text-slate-400 text-[11px] font-mono">0.00% PACKET LOSS</span>
         </div>
         <div className="text-slate-400 text-[11px] font-mono">
           PTP TIMESTAMP: 1714289012.839210s

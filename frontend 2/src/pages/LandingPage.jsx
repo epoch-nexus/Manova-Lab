@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import FadeIn from '../components/FadeIn';
 import PipelineGraph from '../components/PipelineGraph';
 import StroopGaussianGraph from '../components/StroopGaussianGraph';
+import NavigationDots from '../components/NavigationDots';
+
 
 const STROOP_TRIALS = [
   { text: 'GREEN', colorName: 'Red', fontColorClass: 'text-rose-500', targetKey: 'RED' },
@@ -83,7 +85,7 @@ function StreamlinedPipeline() {
   };
 
   return (
-    <section ref={sectionRef} className="relative h-[600vh] bg-slate-50" id="how-it-works">
+    <section ref={sectionRef} className="relative h-[600vh] bg-slate-50" id="pipeline">
       <div className="sticky top-0 h-screen flex items-center">
         <div className="max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8">
           <div className="relative grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
@@ -114,23 +116,20 @@ function StreamlinedPipeline() {
                     >
                       {/* Absolute Positioning Active Pill Box */}
                       <div
-                        className={`absolute inset-0 bg-white rounded-2xl shadow-md border border-neutral-200/80 transition-all duration-300 ease-out will-change-transform transform-gpu backface-hidden -z-10 ${
-                          isActive ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
-                        }`}
+                        className={`absolute inset-0 bg-white rounded-2xl shadow-md border border-neutral-200/80 transition-all duration-300 ease-out will-change-transform transform-gpu backface-hidden -z-10 ${isActive ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
+                          }`}
                         aria-hidden="true"
                       />
 
                       <span
-                        className={`font-mono text-sm relative z-10 transition-colors duration-300 ${
-                          isActive ? 'text-neutral-900 font-bold' : 'text-neutral-400 font-medium'
-                        }`}
+                        className={`font-mono text-sm relative z-10 transition-colors duration-300 ${isActive ? 'text-neutral-900 font-bold' : 'text-neutral-400 font-medium'
+                          }`}
                       >
                         {step.number}
                       </span>
                       <span
-                        className={`text-sm relative z-10 transition-colors duration-300 ${
-                          isActive ? 'text-neutral-900 font-bold' : 'text-neutral-400 font-medium hover:text-neutral-600'
-                        }`}
+                        className={`text-sm relative z-10 transition-colors duration-300 ${isActive ? 'text-neutral-900 font-bold' : 'text-neutral-400 font-medium hover:text-neutral-600'
+                          }`}
                       >
                         {step.title}
                       </span>
@@ -147,11 +146,10 @@ function StreamlinedPipeline() {
                 return (
                   <div
                     key={step.number}
-                    className={`absolute inset-0 bg-white rounded-3xl p-8 border border-neutral-200/80 shadow-sm flex flex-col justify-between ${
-                      isActive
-                        ? 'opacity-100 scale-100 pointer-events-auto z-10 transition-all duration-500'
-                        : 'opacity-0 scale-95 pointer-events-none z-0 transition-all duration-500'
-                    }`}
+                    className={`absolute inset-0 bg-white rounded-3xl p-8 border border-neutral-200/80 shadow-sm flex flex-col justify-between ${isActive
+                      ? 'opacity-100 scale-100 pointer-events-auto z-10 transition-all duration-500'
+                      : 'opacity-0 scale-95 pointer-events-none z-0 transition-all duration-500'
+                      }`}
                   >
                     <div>
                       <div className="w-10 h-10 rounded-xl bg-[#10b981] text-white font-mono text-sm font-bold flex items-center justify-center mb-6 shadow-sm">
@@ -213,6 +211,8 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
+      {/* Left-sidebar vertical section navigation */}
+      <NavigationDots />
       {/* Navigation Header */}
       <header className="w-full bg-white/85 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-50 transition-all duration-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -229,15 +229,15 @@ export default function LandingPage() {
             </Link>
 
             <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
-              <a className="hover:text-emerald-600 transition-colors whitespace-nowrap" href="#product">Product</a>
-              <a className="hover:text-emerald-600 transition-colors whitespace-nowrap" href="#features">Features</a>
-              <a className="hover:text-emerald-600 transition-colors whitespace-nowrap" href="#how-it-works">How It Works</a>
+              <a className="hover:text-emerald-600 transition-colors whitespace-nowrap" href="#architecture">Product</a>
+              <a className="hover:text-emerald-600 transition-colors whitespace-nowrap" href="#capabilities">Features</a>
+              <a className="hover:text-emerald-600 transition-colors whitespace-nowrap" href="#pipeline">How It Works</a>
               <Link to="/science" className="hover:text-emerald-600 transition-colors whitespace-nowrap flex items-center gap-1">
                 <span>Architecture</span>
                 <span className="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold">Spec</span>
               </Link>
               <a className="hover:text-emerald-600 transition-colors whitespace-nowrap" href="#analytics">Analytics</a>
-              <a className="hover:text-emerald-600 transition-colors whitespace-nowrap" href="#demo">Demo</a>
+              <a className="hover:text-emerald-600 transition-colors whitespace-nowrap" href="#sandbox">Demo</a>
             </nav>
           </div>
 
@@ -259,7 +259,7 @@ export default function LandingPage() {
       </header>
 
       {/* Hero Section */}
-      <main className="flex-grow relative">
+      <main id="hero" className="flex-grow relative">
         {/* Glow ambient background elements */}
         <div className="absolute inset-0 pointer-events-none select-none -z-10 overflow-hidden">
           <div className="absolute -top-36 left-1/2 -translate-x-1/2 w-[1300px] h-[680px] cloud-gradient rounded-full blur-3xl opacity-90"></div>
@@ -268,15 +268,15 @@ export default function LandingPage() {
         </div>
 
         <section className="pt-16 pb-16 sm:pt-24 sm:pb-20 text-center px-4 sm:px-6 lg:px-8">
-          <div className="max-w-4xl mx-auto">
+          <div className="max-w-6xl mx-auto">
             <FadeIn>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200/70 text-emerald-800 text-xs font-semibold uppercase tracking-wider mb-6 shadow-xs font-mono">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                 Computational Cognitive Telemetry Engine 3.0
               </div>
 
-              <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-slate-900 leading-[1.12] font-heading">
-                Sub-millisecond accuracy.<br/>
+              <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-slate-900 leading-[1.12] font-heading max-w-4xl mx-auto">
+                Sub-millisecond accuracy.<br />
                 <span className="text-emerald-600">Zero lines of code.</span>
               </h1>
 
@@ -317,43 +317,50 @@ export default function LandingPage() {
               </div>
             </FadeIn>
 
-            {/* Hero Live Telemetry Terminal Card */}
-            <FadeIn delay={200} className="mt-14 max-w-5xl mx-auto rounded-3xl border border-slate-200/90 bg-white/95 backdrop-blur-xl shadow-2xl p-5 sm:p-7 text-left relative overflow-hidden" id="product">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-5">
-                <div className="flex items-center gap-2.5">
-                  <span className="inline-block w-3 h-3 rounded-full bg-rose-400"></span>
-                  <span className="inline-block w-3 h-3 rounded-full bg-amber-400"></span>
-                  <span className="inline-block w-3 h-3 rounded-full bg-emerald-400"></span>
-                  <span className="ml-2 font-mono text-xs text-slate-500 font-medium">pipeline://neuro-stream.manova.internal:443 • LIVE</span>
+            {/* Hero Live Telemetry Terminal Card (~1.1x Scale) */}
+            <FadeIn delay={200} className="mt-14 w-full max-w-5xl mx-auto rounded-3xl border border-slate-200/90 bg-white/95 backdrop-blur-xl shadow-2xl p-6 sm:p-7 text-left relative overflow-hidden will-change-transform transform-gpu">
+              <div className="flex flex-wrap items-center justify-between border-b border-slate-100 pb-4 mb-5 gap-3">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <div className="flex items-center gap-1.5 mr-1">
+                    <span className="inline-block w-3 h-3 rounded-full bg-rose-400"></span>
+                    <span className="inline-block w-3 h-3 rounded-full bg-amber-400"></span>
+                    <span className="inline-block w-3 h-3 rounded-full bg-emerald-400"></span>
+                  </div>
+                  <div className="inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-1.5 min-w-[340px] rounded-full bg-slate-100/90 border border-slate-200/80 shadow-xs">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                    <span className="font-mono text-xs text-slate-600 font-medium text-center">
+                      pipeline://neuro-stream.manova.internal:443 • LIVE
+                    </span>
+                  </div>
                 </div>
                 <div className="flex items-center gap-3 font-mono text-xs">
-                  <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold flex items-center gap-1.5">
+                  <span className="px-3.5 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-ping"></span>
                     PTP CLOCK SYNCED 0.18ms
                   </span>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 sm:gap-4 mb-5">
-                <FadeIn delay={100} className="bg-slate-50/80 rounded-2xl p-4 border border-slate-200/70">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-5">
+                <FadeIn delay={100} className="bg-slate-50/80 rounded-2xl p-4 border border-slate-200/70 shadow-2xs">
                   <p className="text-xs text-slate-500 font-medium uppercase tracking-wider font-mono">Active Paradigm</p>
                   <p className="text-base font-bold text-slate-900 mt-1 font-heading">Rapid Visual ERP</p>
-                  <span className="text-xs text-emerald-700 font-mono">1,200 trials queued</span>
+                  <span className="text-xs text-emerald-700 font-mono font-medium">1,200 trials queued</span>
                 </FadeIn>
-                <FadeIn delay={200} className="bg-slate-50/80 rounded-2xl p-4 border border-slate-200/70">
+                <FadeIn delay={200} className="bg-slate-50/80 rounded-2xl p-4 border border-slate-200/70 shadow-2xs">
                   <p className="text-xs text-slate-500 font-medium uppercase tracking-wider font-mono">Median Latency</p>
                   <p className="text-base font-bold text-emerald-700 mt-1 font-mono">0.24ms ±0.03</p>
                   <span className="text-xs text-slate-500">Hardware clock lock</span>
                 </FadeIn>
-                <FadeIn delay={300} className="bg-slate-50/80 rounded-2xl p-4 border border-slate-200/70">
+                <FadeIn delay={300} className="bg-slate-50/80 rounded-2xl p-4 border border-slate-200/70 shadow-2xs">
                   <p className="text-xs text-slate-500 font-medium uppercase tracking-wider font-mono">Ingest Rate</p>
                   <p className="text-base font-bold text-slate-900 mt-1 font-mono">14,800 events/s</p>
-                  <span className="text-xs text-emerald-700 font-mono">0 packet drops</span>
+                  <span className="text-xs text-emerald-700 font-mono font-medium">0 packet drops</span>
                 </FadeIn>
-                <FadeIn delay={400} className="bg-slate-50/80 rounded-2xl p-4 border border-slate-200/70">
+                <FadeIn delay={400} className="bg-slate-50/80 rounded-2xl p-4 border border-slate-200/70 shadow-2xs">
                   <p className="text-xs text-slate-500 font-medium uppercase tracking-wider font-mono">Synchronized Nodes</p>
                   <p className="text-base font-bold text-slate-900 mt-1 font-heading">EEG + Eye + Keys</p>
-                  <span className="text-xs text-emerald-700">3 Modal Ingestors</span>
+                  <span className="text-xs text-emerald-700 font-medium">3 Modal Ingestors</span>
                 </FadeIn>
               </div>
 
@@ -365,7 +372,7 @@ export default function LandingPage() {
         </section>
 
         {/* 6 Platform Capabilities Cards */}
-        <section className="py-20 bg-white border-y border-slate-200/80 px-4 sm:px-6 lg:px-8" id="features">
+        <section className="py-20 bg-white border-y border-slate-200/80 px-4 sm:px-6 lg:px-8" id="capabilities">
           <div className="max-w-6xl mx-auto">
             <FadeIn className="text-center max-w-3xl mx-auto mb-16">
               <span className="text-xs font-bold uppercase tracking-widest text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200/80 font-mono">
@@ -493,7 +500,7 @@ export default function LandingPage() {
         <StreamlinedPipeline />
 
         {/* Engineered for Both Sides of the Glass */}
-        <section className="py-20 bg-white border-y border-slate-200/80 px-4 sm:px-6 lg:px-8">
+        <section className="py-20 bg-white border-y border-slate-200/80 px-4 sm:px-6 lg:px-8" id="architecture">
           <div className="max-w-6xl mx-auto">
             <FadeIn className="text-center max-w-3xl mx-auto mb-16">
               <span className="text-xs font-bold uppercase tracking-widest text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 font-mono">
@@ -663,7 +670,7 @@ export default function LandingPage() {
         </section>
 
         {/* Live Client-Side Sandbox: Interactive Stroop Reaction Time Tester */}
-        <section className="py-20 bg-slate-900 text-white px-4 sm:px-6 lg:px-8 relative overflow-hidden" id="demo">
+        <section className="py-20 bg-slate-900 text-white px-4 sm:px-6 lg:px-8 relative overflow-hidden" id="sandbox">
           <div className="absolute -top-32 right-1/4 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[100px] pointer-events-none"></div>
           <div className="max-w-4xl mx-auto text-center relative z-10">
             <FadeIn>
