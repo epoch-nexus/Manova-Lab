@@ -97,7 +97,7 @@ describe('Phase 8 — Researcher Authentication & Authorization', () => {
 
       expect(duplicateRes.status).toBe(409);
       expect(duplicateRes.body.error).toBeDefined();
-      expect(duplicateRes.body.error.code).toBe('VALIDATION_ERROR');
+      expect(duplicateRes.body.error.code).toBe('EMAIL_ALREADY_EXISTS');
       expect(duplicateRes.body.error.message).toContain('already exists');
     });
 

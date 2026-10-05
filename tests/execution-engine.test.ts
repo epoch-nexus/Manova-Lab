@@ -103,9 +103,9 @@ describe('ExecutionEngine Unit Tests', () => {
       expect(step.status).toBe('IN_PROGRESS');
       expect(step.currentTrial).not.toBeNull();
       expect(step.currentTrial?.id).toBe(mockExperiment.trials[0]!.id);
-      expect(step.currentTrial?.stimulus.content).toBe('TARGET');
+      expect((step.currentTrial?.stimulus as any).content).toBe('TARGET');
       expect((step.currentTrial?.expectedResponse as any).correctResponse).toBeUndefined();
-      expect(step.currentTrial?.expectedResponse.allowedKeys).toEqual(['Space', 'KeyF']);
+      expect((step.currentTrial?.expectedResponse as any).allowedKeys).toEqual(['Space', 'KeyF']);
       expect(step.generalInstructions).toBe('Look at the cross and respond.');
       expect(step.isCompleted).toBe(false);
     });
@@ -135,23 +135,23 @@ describe('ExecutionEngine Unit Tests', () => {
   describe('validateResponse', () => {
     it('should accept an allowed keypress response', () => {
       expect(() => {
-        engine.validateResponse(mockExperiment.trials[0]!, 'Space');
+        engine.validateResponse(mockExperiment.trials[0]!, 'Space', false, 250);
       }).not.toThrow();
 
       expect(() => {
-        engine.validateResponse(mockExperiment.trials[0]!, 'KeyF');
+        engine.validateResponse(mockExperiment.trials[0]!, 'KeyF', false, 250);
       }).not.toThrow();
     });
 
     it('should accept null (timeout/non-response)', () => {
       expect(() => {
-        engine.validateResponse(mockExperiment.trials[0]!, null);
+        engine.validateResponse(mockExperiment.trials[0]!, null, true, null);
       }).not.toThrow();
     });
 
     it('should reject a disallowed keypress response', () => {
       expect(() => {
-        engine.validateResponse(mockExperiment.trials[0]!, 'KeyZ');
+        engine.validateResponse(mockExperiment.trials[0]!, 'KeyZ', false, 250);
       }).toThrow('Invalid response');
     });
   });

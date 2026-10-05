@@ -71,14 +71,14 @@ export type EvaluationMode = 'exact_match' | 'none';
 export interface ExpectedKeypressResponse {
   type: 'keypress';
   allowedKeys: string[];
-  correctResponse?: string;
+  correctResponse?: string | null;
   evaluationMode: EvaluationMode;
 }
 
 export interface ExpectedButtonClickResponse {
   type: 'button_click';
   allowedButtons: string[];
-  correctResponse?: string;
+  correctResponse?: string | null;
   evaluationMode: EvaluationMode;
 }
 
@@ -104,24 +104,12 @@ export interface FixationConfig {
 // 4. Trial Progression & Branching Seam
 // ==========================================
 
-export interface BranchingCondition {
-  operator: 'equals' | 'not_equals' | 'less_than' | 'greater_than';
-  field: 'isCorrect' | 'reactionTimeMs' | 'submittedResponse';
-  value: string | number | boolean;
-  targetTrialId: UUID;
-}
-
 export interface CorrectnessBranchingRule {
-  ifCorrect: UUID;
-  ifIncorrect: UUID;
+  ifCorrect: UUID | null;
+  ifIncorrect: UUID | null;
 }
 
-export interface LegacyBranchingRule {
-  conditions: BranchingCondition[];
-  defaultNextTrialId: UUID | null;
-}
-
-export type TrialBranchingRule = CorrectnessBranchingRule | LegacyBranchingRule;
+export type TrialBranchingRule = CorrectnessBranchingRule;
 
 export interface Trial {
   id: UUID;
@@ -236,7 +224,32 @@ export interface Session {
 }
 
 // ==========================================
-// 8. API Error Shapes
+// 8. Results Record Shape (additive)
+// ==========================================
+
+/**
+ * A single formatted result record returned by the results API.
+ * sessionStatus is additive — clients that ignore unknown fields are unaffected.
+ */
+export interface ResultRecord {
+  id: string;
+  sessionId: string;
+  experimentId: string;
+  experimentVersion: number;
+  trialId: string;
+  submittedResponse: string | null;
+  isCorrect: boolean | null;
+  reactionTimeMs: number | null;
+  timedOut: boolean;
+  timingMeasurement: unknown;
+  clientMetadata: unknown;
+  submittedAt: string;
+  /** Additive: status of the parent session at time of export */
+  sessionStatus: SessionStatus;
+}
+
+// ==========================================
+// 9. API Error Shapes
 // ==========================================
 
 export type ApiErrorCode =
@@ -244,6 +257,8 @@ export type ApiErrorCode =
   | 'INVALID_EXPERIMENT'
   | 'EXPERIMENT_NOT_PUBLISHED'
   | 'EXPERIMENT_ALREADY_PUBLISHED'
+  | 'EXPERIMENT_HAS_DATA'
+  | 'EMAIL_ALREADY_EXISTS'
   | 'SESSION_NOT_FOUND'
   | 'SESSION_ALREADY_COMPLETED'
   | 'INVALID_RESPONSE'
@@ -252,6 +267,10 @@ export type ApiErrorCode =
   | 'FORBIDDEN'
   | 'VALIDATION_ERROR'
   | 'EXECUTION_LIMIT_EXCEEDED'
+  | 'NOT_FOUND'
+  | 'PAYLOAD_TOO_LARGE'
+  | 'TRANSACTION_CONFLICT'
+  | 'RATE_LIMIT_EXCEEDED'
   | 'INTERNAL_SERVER_ERROR';
 
 export interface AuthenticatedResearcher {
@@ -276,6 +295,7 @@ export interface AuthResponse {
 export interface ApiErrorDetail {
   field?: string;
   message: string;
+  code?: string;
 }
 
 export interface ApiErrorResponse {
@@ -283,6 +303,7 @@ export interface ApiErrorResponse {
     code: ApiErrorCode;
     message: string;
     details?: ApiErrorDetail[];
+    fieldErrors?: Record<string, string[]>;
   };
 }
 

@@ -27,3 +27,11 @@ export function createRateLimiter(options?: Partial<Options>) {
  * Dedicated rate limiter for sensitive authentication endpoints (register and login).
  */
 export const authRateLimiter = createRateLimiter();
+
+/**
+ * Generous per-IP rate limiter for participant session creation (e.g., 60 requests per 15 minutes).
+ */
+export const sessionCreationRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+});

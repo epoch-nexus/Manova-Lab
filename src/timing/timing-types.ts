@@ -6,6 +6,19 @@ import type {
 } from '../types/experiment.d.ts';
 
 /**
+ * Typed error thrown when a trial is aborted or superseded by a new trial.
+ * Fix 3: Resolves or rejects the pending promise on abort or supersede with a typed AbortError.
+ */
+export class AbortError extends Error {
+  readonly code = 'TRIAL_ABORTED' as const;
+  constructor(message = 'Trial was aborted or superseded') {
+    super(message);
+    this.name = 'AbortError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
  * High-Precision Timing Engine Lifecycle States.
  * Strictly distinct from Phase 3 experiment progression states.
  */
@@ -54,6 +67,10 @@ export interface TimingResult {
 /**
  * Environmental clock and animation frame abstraction for deterministic testing
  * and browser execution.
+ *
+ * Fix 4: addVisibilityListener / removeVisibilityListener are added so custom
+ * environments (tests, workers) can intercept visibility events without relying
+ * on the global `document`.
  */
 export interface TimingEnvironment {
   now(): number;
@@ -62,6 +79,16 @@ export interface TimingEnvironment {
   setTimeout(callback: () => void, ms: number): number | NodeJS.Timeout;
   clearTimeout(id: number | NodeJS.Timeout): void;
   getVisibilityState(): 'visible' | 'hidden';
+  /**
+   * Subscribe to document visibility changes.
+   * The controller calls this once per trial; the implementation should attach
+   * the listener to whatever visibility event source is appropriate.
+   */
+  addVisibilityListener?(listener: () => void): void;
+  /**
+   * Unsubscribe a previously registered visibility listener.
+   */
+  removeVisibilityListener?(listener: () => void): void;
   addEventListener?(type: string, listener: EventListenerOrEventListenerObject): void;
   removeEventListener?(type: string, listener: EventListenerOrEventListenerObject): void;
 }

@@ -60,6 +60,7 @@ model Experiment {
   trials              Trial[]
   versions            ExperimentVersion[]
 
+  @@index([ownerResearcherId])
   @@map("experiments")
 }
 
@@ -79,6 +80,8 @@ model Trial {
   stimulus            Stimulus?
   expectedResponse    ExpectedResponse?
 
+  @@unique([experimentId, orderIndex])
+  @@index([experimentId])
   @@map("trials")
 }
 
@@ -123,6 +126,7 @@ model ExperimentVersion {
   experiment          Experiment        @relation(fields: [experimentId], references: [id], onDelete: Cascade)
   sessions            Session[]
 
+  @@unique([experimentId, version])
   @@map("experiment_versions")
 }
 
@@ -151,6 +155,8 @@ model Session {
   version              ExperimentVersion @relation(fields: [experimentSnapshotId], references: [snapshotId], onDelete: Cascade)
   responses            SessionResponse[]
 
+  @@index([experimentId])
+  @@index([experimentSnapshotId])
   @@map("sessions")
 }
 

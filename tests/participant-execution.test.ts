@@ -349,7 +349,7 @@ describe('Participant Execution API (Phase 3)', () => {
       // 4. Submit response for Trial 1 -> Advances to Trial 2
       const resp1 = await request(app)
         .post(`/api/v1/participant/sessions/${sessionId}/trials/aaaaaaaa-1111-4111-8111-111111111111/response`)
-        .send({ submittedResponse: 'KeyG' });
+        .send({ submittedResponse: 'KeyG', reactionTimeMs: 400 });
 
       expect(resp1.status).toBe(200);
       expect(resp1.body.sessionStatus).toBe('IN_PROGRESS');
@@ -359,7 +359,7 @@ describe('Participant Execution API (Phase 3)', () => {
       // 5. Submit response for Trial 2 -> Advances to Trial 3
       const resp2 = await request(app)
         .post(`/api/v1/participant/sessions/${sessionId}/trials/bbbbbbbb-1111-4111-8111-111111111111/response`)
-        .send({ submittedResponse: 'KeyR' });
+        .send({ submittedResponse: 'KeyR', reactionTimeMs: 420 });
 
       expect(resp2.status).toBe(200);
       expect(resp2.body.sessionStatus).toBe('IN_PROGRESS');
@@ -369,7 +369,7 @@ describe('Participant Execution API (Phase 3)', () => {
       // 6. Submit response for Trial 3 (Terminal) -> Transitions to COMPLETED
       const resp3 = await request(app)
         .post(`/api/v1/participant/sessions/${sessionId}/trials/cccccccc-1111-4111-8111-111111111111/response`)
-        .send({ submittedResponse: 'KeyB' });
+        .send({ submittedResponse: 'KeyB', reactionTimeMs: 380 });
 
       expect(resp3.status).toBe(200);
       expect(resp3.body.sessionStatus).toBe('COMPLETED');
@@ -387,7 +387,7 @@ describe('Participant Execution API (Phase 3)', () => {
       // 8. Verify subsequent submission is rejected with 409 SESSION_ALREADY_COMPLETED
       const afterComplete = await request(app)
         .post(`/api/v1/participant/sessions/${sessionId}/trials/cccccccc-1111-4111-8111-111111111111/response`)
-        .send({ submittedResponse: 'KeyB' });
+        .send({ submittedResponse: 'KeyB', reactionTimeMs: 380 });
 
       expect(afterComplete.status).toBe(409);
       expect(afterComplete.body.error.code).toBe('SESSION_ALREADY_COMPLETED');
@@ -468,7 +468,7 @@ describe('Participant Execution API (Phase 3)', () => {
       // Session is on trial 1, try submitting trial 2
       const res = await request(app)
         .post(`/api/v1/participant/sessions/${activeSessionId}/trials/eeeeeeee-1111-4111-8111-111111111111/response`)
-        .send({ submittedResponse: 'Space' });
+        .send({ submittedResponse: 'Space', reactionTimeMs: 350 });
 
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('INVALID_RESPONSE');
@@ -478,7 +478,7 @@ describe('Participant Execution API (Phase 3)', () => {
     it('should reject disallowed response key with 400 INVALID_RESPONSE', async () => {
       const res = await request(app)
         .post(`/api/v1/participant/sessions/${activeSessionId}/trials/dddddddd-1111-4111-8111-111111111111/response`)
-        .send({ submittedResponse: 'KeyZ' }); // Space is only allowed key
+        .send({ submittedResponse: 'KeyZ', reactionTimeMs: 350 }); // Space is only allowed key
 
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('INVALID_RESPONSE');
@@ -502,7 +502,7 @@ describe('Participant Execution API (Phase 3)', () => {
       // Subsequent submissions should be rejected
       const submitAfterAbandon = await request(app)
         .post(`/api/v1/participant/sessions/${activeSessionId}/trials/dddddddd-1111-4111-8111-111111111111/response`)
-        .send({ submittedResponse: 'Space' });
+        .send({ submittedResponse: 'Space', reactionTimeMs: 350 });
 
       expect(submitAfterAbandon.status).toBe(409);
     });
@@ -583,10 +583,10 @@ describe('Participant Execution API (Phase 3)', () => {
       const [resA, resB] = await Promise.all([
         request(app)
           .post(`/api/v1/participant/sessions/${sessionId}/trials/ffffffff-1111-4111-8111-111111111111/response`)
-          .send({ submittedResponse: 'Space' }),
+          .send({ submittedResponse: 'Space', reactionTimeMs: 350 }),
         request(app)
           .post(`/api/v1/participant/sessions/${sessionId}/trials/ffffffff-1111-4111-8111-111111111111/response`)
-          .send({ submittedResponse: 'Space' }),
+          .send({ submittedResponse: 'Space', reactionTimeMs: 350 }),
       ]);
 
       // Exactly one request must succeed (200), and the other must be rejected (400 or 409)

@@ -18,6 +18,7 @@ experimentRouter.post(
     try {
       const researcherId = req.researcher!.id;
       const result = await experimentService.createExperiment(req.body, researcherId);
+      res.setHeader('Location', `/api/v1/experiments/${result.id}`);
       res.status(201).json(result);
     } catch (err) {
       next(err);
@@ -89,7 +90,8 @@ experimentRouter.delete(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const researcherId = req.researcher!.id;
-      await experimentService.deleteExperiment(req.params.id as string, researcherId);
+      const force = req.query.force === 'true';
+      await experimentService.deleteExperiment(req.params.id as string, researcherId, force);
       res.status(204).send();
     } catch (err) {
       next(err);

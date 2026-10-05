@@ -1,11 +1,16 @@
-import type {
-  TimingState,
-  TimingTrialInput,
-  TimingResult,
-  TimingEnvironment,
-  TimingLifecycleCallbacks,
+import {
+  AbortError,
+  type TimingState,
+  type TimingTrialInput,
+  type TimingResult,
+  type TimingEnvironment,
+  type TimingLifecycleCallbacks,
 } from './timing-types.js';
 import type { TimingMethod } from '../types/experiment.d.ts';
+
+export { AbortError };
+export const TrialAbortedError = AbortError;
+export type TrialAbortedError = AbortError;
 
 /**
  * Creates default browser environment adapters using native browser APIs.
@@ -47,6 +52,17 @@ function createDefaultBrowserEnvironment(): TimingEnvironment {
       }
       return 'visible';
     },
+    // Fix 4: addVisibilityListener/removeVisibilityListener on the environment
+    addVisibilityListener(listener: () => void): void {
+      if (typeof document !== 'undefined' && document.addEventListener) {
+        document.addEventListener('visibilitychange', listener);
+      }
+    },
+    removeVisibilityListener(listener: () => void): void {
+      if (typeof document !== 'undefined' && document.removeEventListener) {
+        document.removeEventListener('visibilitychange', listener);
+      }
+    },
     addEventListener(type: string, listener: EventListenerOrEventListenerObject): void {
       if (typeof window !== 'undefined' && window.addEventListener) {
         window.addEventListener(type, listener);
@@ -83,6 +99,9 @@ export class TimingController {
   private rafHandle: number | null = null;
   private keydownListener: ((e: KeyboardEvent) => void) | null = null;
   private visibilityListener: (() => void) | null = null;
+
+  // Fix 3: track and resolve/reject the pending trial promise on abort/supersede
+  private pendingReject: ((err: TrialAbortedError) => void) | null = null;
 
   // Real-time telemetry
   private hiddenTabDetected = false;
@@ -139,37 +158,51 @@ export class TimingController {
   /**
    * Aborts active trial and resets state to IDLE.
    * Cancels all timers, frame callbacks, and event listeners.
+   * Fix 3: rejects the pending promise with a TrialAbortedError.
    */
   abortTrial(): void {
+    const reject = this.pendingReject;
+    this.pendingReject = null;
     this.cleanupActiveTrial();
     this.transitionState('IDLE');
+    reject?.(new AbortError('Trial was explicitly aborted'));
   }
 
   /**
    * Runs an atomic behavioral trial through the complete high-precision timing lifecycle.
+   * Fix 3: superseding a running trial rejects its promise with AbortError.
    */
   async runTrial(
     trial: TimingTrialInput,
     callbacks?: TimingLifecycleCallbacks
   ): Promise<TimingResult> {
-    // 1. Terminate any previous trial context and increment trial token
+    // 1. Terminate any previous trial context:
+    //    reject the previous pending promise before overwriting it (Fix 3)
+    const prevReject = this.pendingReject;
+    this.pendingReject = null;
     this.cleanupActiveTrial();
+    prevReject?.(new AbortError('Trial superseded by a new runTrial() call'));
+
     const currentToken = ++this.tokenCounter;
     this.activeTrialToken = currentToken;
 
     this.hiddenTabDetected = this.env.getVisibilityState() === 'hidden';
 
-    // 2. Track visibility changes during this trial
-    if (typeof document !== 'undefined' && document.addEventListener) {
-      this.visibilityListener = () => {
-        if (this.env.getVisibilityState() === 'hidden') {
-          this.hiddenTabDetected = true;
-        }
-      };
-      document.addEventListener('visibilitychange', this.visibilityListener);
+    // 2. Track visibility changes using the injected environment (Fix 4)
+    const visListener = () => {
+      if (this.env.getVisibilityState() === 'hidden') {
+        this.hiddenTabDetected = true;
+      }
+    };
+    this.visibilityListener = visListener;
+    if (this.env.addVisibilityListener) {
+      this.env.addVisibilityListener(visListener);
     }
 
-    return new Promise<TimingResult>((resolve) => {
+    return new Promise<TimingResult>((resolve, reject) => {
+      // Store the reject so abortTrial()/supersede can resolve the promise (Fix 3)
+      this.pendingReject = reject;
+
       const timingConfig = trial.timingConfig;
       const expectedResponse = trial.expectedResponse;
       const preStimulusStart = this.env.now();
@@ -183,8 +216,33 @@ export class TimingController {
           return;
         }
         trialFinished = true;
+        this.pendingReject = null;
         this.cleanupActiveTrial();
         resolve(result);
+      };
+
+      // ---------------------------------------------------------------
+      // Input filtering helpers (Fix 1 & Fix 2)
+      // ---------------------------------------------------------------
+      /**
+       * Returns true if the given input code is an allowed response for the
+       * current trial's expected-response configuration.
+       * Applied in BOTH the early-response and awaiting-response paths.
+       */
+      const isAllowedInput = (code: string): boolean => {
+        if (expectedResponse.type === 'keypress') {
+          const allowed = expectedResponse.allowedKeys;
+          if (allowed && allowed.length > 0 && !allowed.includes(code)) {
+            return false;
+          }
+        } else if (expectedResponse.type === 'button_click') {
+          // Fix 2: filter button_click on allowedButtons
+          const allowed = expectedResponse.allowedButtons;
+          if (allowed && allowed.length > 0 && !allowed.includes(code)) {
+            return false;
+          }
+        }
+        return true;
       };
 
       // 3. Early response listener during PRE_STIMULUS
@@ -193,6 +251,9 @@ export class TimingController {
 
         if (this.state === 'PRE_STIMULUS') {
           if (timingConfig.allowEarlyResponse) {
+            // Fix 1: apply the same allowedKeys / allowedButtons filter here
+            if (!isAllowedInput(keyOrBtn)) return;
+
             const responseTimestamp = this.env.now();
             const earlyLatency = responseTimestamp - preStimulusStart;
             this.transitionState('RESPONSE_CAPTURED', callbacks);
@@ -233,13 +294,10 @@ export class TimingController {
         }
 
         if (this.state === 'AWAITING_RESPONSE') {
-          // Check allowed response
-          if (expectedResponse.type === 'keypress') {
-            const allowed = expectedResponse.allowedKeys;
-            if (allowed && allowed.length > 0 && !allowed.includes(code)) {
-              // Disallowed key pressed: ignore and continue awaiting valid key
-              return;
-            }
+          // Fix 1 & Fix 2: use shared isAllowedInput() for both keypress and button_click
+          if (!isAllowedInput(code)) {
+            // Disallowed key/button: ignore and continue awaiting valid input
+            return;
           }
 
           // Valid response captured! Latch timestamp immediately
@@ -419,8 +477,11 @@ export class TimingController {
     }
     this.removeInputListener();
 
-    if (this.visibilityListener && typeof document !== 'undefined' && document.removeEventListener) {
-      document.removeEventListener('visibilitychange', this.visibilityListener);
+    // Fix 4: use env.removeVisibilityListener instead of global document
+    if (this.visibilityListener) {
+      if (this.env.removeVisibilityListener) {
+        this.env.removeVisibilityListener(this.visibilityListener);
+      }
       this.visibilityListener = null;
     }
   }

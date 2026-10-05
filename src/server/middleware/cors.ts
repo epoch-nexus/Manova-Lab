@@ -1,19 +1,26 @@
 import cors, { type CorsOptions } from 'cors';
 import type { RequestHandler } from 'express';
+import { config } from '../../config/env.js';
 
 /**
  * Creates environment-aware CORS middleware.
- * In production: strictly enforces allowed origins from CORS_ORIGIN environment variable.
- * In development/test: allows all origins for developer convenience.
+ * In production: strictly enforces allowed origins from CORS_ORIGIN config.
+ * In development/test: allows all origins or configured origin for developer convenience.
  */
 export function createCorsMiddleware(): RequestHandler {
-  const isProd = process.env.NODE_ENV === 'production';
-  const corsOriginEnv = process.env.CORS_ORIGIN;
+  // Read from validated config with process.env fallback/override for dynamic test suites
+  const isProd = (process.env.NODE_ENV ?? config.NODE_ENV) === 'production';
+  const corsOrigin = process.env.CORS_ORIGIN ?? config.CORS_ORIGIN;
 
   if (isProd) {
-    const allowedOrigins = corsOriginEnv
-      ? corsOriginEnv.split(',').map((o) => o.trim()).filter(Boolean)
-      : [];
+    if (!corsOrigin || corsOrigin.trim() === '' || corsOrigin.trim() === '*') {
+      throw new Error('SECURITY ERROR: Production requires a specific CORS_ORIGIN (cannot be empty or "*").');
+    }
+
+    const allowedOrigins = corsOrigin
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean);
 
     const corsOptions: CorsOptions = {
       origin: (origin, callback) => {
@@ -36,8 +43,8 @@ export function createCorsMiddleware(): RequestHandler {
 
   // Development/Test mode
   return cors({
-    origin: corsOriginEnv && corsOriginEnv !== '*'
-      ? corsOriginEnv.split(',').map((o) => o.trim()).filter(Boolean)
+    origin: corsOrigin && corsOrigin !== '*'
+      ? corsOrigin.split(',').map((o) => o.trim()).filter(Boolean)
       : true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],

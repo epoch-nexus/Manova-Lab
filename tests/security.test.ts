@@ -3,7 +3,7 @@ import express, { type Request, type Response } from 'express';
 import { createApp } from '../src/server/app.js';
 import { prisma } from '../src/db/prisma.js';
 import { createRateLimiter } from '../src/server/middleware/rate-limiter.js';
-import { validateConfig, DEV_DEFAULT_JWT_SECRET } from '../src/config/env.js';
+import { validateConfig, TEST_JWT_SECRET } from '../src/config/env.js';
 import { createCorsMiddleware } from '../src/server/middleware/cors.js';
 import { errorHandler } from '../src/server/middleware/errorHandler.js';
 
@@ -184,14 +184,13 @@ describe('Phase 9 — Integration Hardening & Security Test Suite', () => {
   });
 
   describe('4. Environment & Configuration Validation', () => {
-    it('should reject insecure default JWT secret in production mode', () => {
+    it('should reject missing JWT_SECRET in production mode', () => {
       expect(() => {
         validateConfig({
           NODE_ENV: 'production',
           DATABASE_URL: 'postgresql://localhost:5432/manova_labs',
-          JWT_SECRET: DEV_DEFAULT_JWT_SECRET,
         });
-      }).toThrow(/SECURITY ERROR: Production deployment cannot use the default development JWT_SECRET/);
+      }).toThrow(/SECURITY ERROR: JWT_SECRET is required in production/);
     });
 
     it('should reject short JWT secret (< 32 chars) in production mode', () => {
@@ -214,12 +213,21 @@ describe('Phase 9 — Integration Hardening & Security Test Suite', () => {
       expect(cfg.JWT_SECRET).toBe('a-very-long-production-grade-cryptographic-secret-256bits');
     });
 
-    it('should permit convenient defaults in development mode', () => {
+    it('should generate a random ephemeral secret (>= 32 chars) in development mode when none provided', () => {
       const cfg = validateConfig({
         NODE_ENV: 'development',
       });
       expect(cfg.NODE_ENV).toBe('development');
-      expect(cfg.JWT_SECRET).toBe(DEV_DEFAULT_JWT_SECRET);
+      expect(typeof cfg.JWT_SECRET).toBe('string');
+      expect(cfg.JWT_SECRET.length).toBeGreaterThanOrEqual(32);
+    });
+
+    it('should use fixed test secret in test mode', () => {
+      const cfg = validateConfig({
+        NODE_ENV: 'test',
+      });
+      expect(cfg.NODE_ENV).toBe('test');
+      expect(cfg.JWT_SECRET).toBe(TEST_JWT_SECRET);
     });
   });
 
@@ -346,8 +354,8 @@ describe('Phase 9 — Integration Hardening & Security Test Suite', () => {
       const crossGet = await request(app)
         .get(`/api/v1/experiments/${exp.body.id}`)
         .set('Authorization', `Bearer ${r2.body.token}`);
-      expect(crossGet.status).toBe(403);
-      expect(crossGet.body.error.code).toBe('FORBIDDEN');
+      expect(crossGet.status).toBe(404);
+      expect(crossGet.body.error.code).toBe('EXPERIMENT_NOT_FOUND');
 
       const crossResults = await request(app)
         .get(`/api/v1/experiments/${exp.body.id}/results`)
@@ -382,7 +390,7 @@ describe('Phase 9 — Integration Hardening & Security Test Suite', () => {
 
       const respRes = await request(app)
         .post(`/api/v1/participant/sessions/${sessionRes.body.sessionId}/trials/${trialId}/response`)
-        .send({ submittedResponse: 'Space' });
+        .send({ submittedResponse: 'Space', reactionTimeMs: 250 });
       expect(respRes.status).toBe(200);
       expect(respRes.body.isCompleted).toBe(true);
     });

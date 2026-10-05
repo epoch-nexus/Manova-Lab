@@ -1,5 +1,6 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { SessionService } from '../../domain/session.service.js';
+import { sessionCreationRateLimiter } from '../middleware/rate-limiter.js';
 
 export const participantRouter = Router();
 const sessionService = new SessionService();
@@ -10,6 +11,7 @@ const sessionService = new SessionService();
  */
 participantRouter.post(
   '/experiments/:publicSlug/sessions',
+  sessionCreationRateLimiter,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const result = await sessionService.startSession(

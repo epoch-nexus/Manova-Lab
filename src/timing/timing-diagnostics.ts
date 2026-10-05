@@ -80,9 +80,11 @@ export class TimingDiagnostics {
         ? rts[mid]!
         : (rts[mid - 1]! + rts[mid]!) / 2;
 
-    // Standard deviation
+    // Sample Standard Deviation (N-1) to match the results service (Fix 6)
     const variance =
-      rts.reduce((acc, v) => acc + Math.pow(v - meanRt, 2), 0) / rts.length;
+      rts.length > 1
+        ? rts.reduce((acc, v) => acc + Math.pow(v - meanRt, 2), 0) / (rts.length - 1)
+        : 0;
     const stdDevRt = Math.sqrt(variance);
 
     return {

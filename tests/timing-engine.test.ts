@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from '@jest/globals';
 import {
   TimingController,
   TimingDiagnostics,
+  AbortError,
   type TimingTrialInput,
   type TimingEnvironment,
   type TimingState,
@@ -11,7 +12,7 @@ interface ScheduledEvent {
   id: number;
   type: 'timer' | 'raf';
   fireAt: number;
-  cb: (ts?: number) => void;
+  cb: (ts: number) => void;
 }
 
 class MockTimingEnvironment implements TimingEnvironment {
@@ -20,6 +21,7 @@ class MockTimingEnvironment implements TimingEnvironment {
   private events: ScheduledEvent[] = [];
   private nextId = 1;
   private listeners: Map<string, Array<(e: any) => void>> = new Map();
+  private visibilityListeners: Array<() => void> = [];
 
   now(): number {
     return this.currentTime;
@@ -59,6 +61,21 @@ class MockTimingEnvironment implements TimingEnvironment {
 
   getVisibilityState(): 'visible' | 'hidden' {
     return this.visibility;
+  }
+
+  addVisibilityListener(listener: () => void): void {
+    this.visibilityListeners.push(listener);
+  }
+
+  removeVisibilityListener(listener: () => void): void {
+    this.visibilityListeners = this.visibilityListeners.filter((l) => l !== listener);
+  }
+
+  simulateVisibilityChange(state: 'visible' | 'hidden'): void {
+    this.visibility = state;
+    for (const listener of this.visibilityListeners) {
+      listener();
+    }
   }
 
   addEventListener(type: string, listener: any): void {
@@ -368,14 +385,14 @@ describe('Phase 4 High-Precision Timing Engine', () => {
   });
 
   // ==========================================
-  // Test 7 — Trial Isolation
+  // Test 7 — Trial Isolation & Promise Abort (Fix 3)
   // ==========================================
   it('Test 7 — Trial isolation: aborting or finishing Trial N cannot leak callbacks or mutate Trial N+1', async () => {
     const trial1 = createSampleTrial({ id: 'trial_1' });
     const trial2 = createSampleTrial({ id: 'trial_2' });
 
     let trial1CallbackCount = 0;
-    controller.runTrial(trial1, {
+    const run1 = controller.runTrial(trial1, {
       onResponseCaptured: () => {
         trial1CallbackCount++;
       },
@@ -385,8 +402,10 @@ describe('Phase 4 High-Precision Timing Engine', () => {
     env.tick(250);
 
     // Abort trial 1 early and immediately run trial 2
+    // Fix 3: abortTrial() rejects the active trial promise with AbortError
     controller.abortTrial();
     expect(controller.getState()).toBe('IDLE');
+    await expect(run1).rejects.toThrow(AbortError);
 
     const run2 = controller.runTrial(trial2);
     env.advanceToStimulusOnset(500);
@@ -442,5 +461,127 @@ describe('Phase 4 High-Precision Timing Engine', () => {
     expect(summary.maxRtMs).toBe(340);
     expect(summary.meanRtMs).toBeGreaterThan(250);
     expect(summary.meanRtMs).toBeLessThan(300);
+  });
+
+  // ==========================================
+  // Test 9 — Early Response Filtered on allowedKeys (Fix 1)
+  // ==========================================
+  it('Test 9 — Early response filter: ignores disallowed keys in early response path and accepts allowed keys', async () => {
+    const trial = createSampleTrial({
+      timingConfig: {
+        preStimulusDelayMs: 600,
+        stimulusDurationMs: 1000,
+        responseTimeoutMs: 2000,
+        allowEarlyResponse: true,
+        waitForResponse: false,
+      },
+      expectedResponse: {
+        type: 'keypress',
+        allowedKeys: ['KeyA', 'KeyB'],
+      },
+    });
+
+    const runPromise = controller.runTrial(trial);
+
+    // Press disallowed key ('Space') at 150ms in PRE_STIMULUS: must be ignored
+    env.tick(150);
+    env.triggerKeydown('Space');
+    expect(controller.getState()).toBe('PRE_STIMULUS');
+
+    // Press allowed key ('KeyA') at 250ms in PRE_STIMULUS: must be captured
+    env.tick(100);
+    env.triggerKeydown('KeyA');
+
+    const result = await runPromise;
+    expect(result.timedOut).toBe(false);
+    expect(result.submittedResponse).toBe('KeyA');
+    expect(result.reactionTimeMs).toBe(250);
+    expect(controller.getState()).toBe('COMPLETE');
+  });
+
+  // ==========================================
+  // Test 10 — Button Click Filtering on allowedButtons (Fix 2)
+  // ==========================================
+  it('Test 10 — Button click filtering: checks allowedButtons in both early and awaiting states', async () => {
+    const trial = createSampleTrial({
+      timingConfig: {
+        preStimulusDelayMs: 400,
+        stimulusDurationMs: 1000,
+        responseTimeoutMs: 2000,
+        allowEarlyResponse: true,
+        waitForResponse: false,
+      },
+      expectedResponse: {
+        type: 'button_click',
+        allowedButtons: ['btn_left', 'btn_right'],
+      },
+    });
+
+    // 10a. Early state: disallowed button is ignored
+    const runPromise = controller.runTrial(trial);
+    env.tick(100);
+    controller.dispatchInput('btn_wrong');
+    expect(controller.getState()).toBe('PRE_STIMULUS');
+
+    // Advance to AWAITING_RESPONSE
+    env.advanceToStimulusOnset(300);
+    expect(controller.getState()).toBe('AWAITING_RESPONSE');
+
+    // Awaiting state: disallowed button is ignored
+    env.tick(50);
+    controller.dispatchInput('btn_wrong');
+    expect(controller.getState()).toBe('AWAITING_RESPONSE');
+
+    // Valid button clicked: captured
+    env.tick(100);
+    controller.dispatchInput('btn_right');
+
+    const result = await runPromise;
+    expect(result.submittedResponse).toBe('btn_right');
+    expect(result.reactionTimeMs).toBe(150);
+    expect(controller.getState()).toBe('COMPLETE');
+  });
+
+  // ==========================================
+  // Test 11 — Re-entrant runTrial() rejects superseded trial with AbortError (Fix 3)
+  // ==========================================
+  it('Test 11 — Re-entrant runTrial(): rejects the superseded trial with typed AbortError', async () => {
+    const trial1 = createSampleTrial({ id: 'trial_superseded_1' });
+    const trial2 = createSampleTrial({ id: 'trial_active_2' });
+
+    const run1 = controller.runTrial(trial1);
+    env.tick(100);
+
+    // Call runTrial() again without waiting: supersedes trial1
+    const run2 = controller.runTrial(trial2);
+
+    await expect(run1).rejects.toThrow(AbortError);
+
+    // Trial 2 proceeds normally
+    env.advanceToStimulusOnset(500);
+    env.tick(120);
+    env.triggerKeydown('Space');
+
+    const result2 = await run2;
+    expect(result2.trialId).toBe('trial_active_2');
+    expect(result2.submittedResponse).toBe('Space');
+  });
+
+  // ==========================================
+  // Test 12 — Custom TimingEnvironment visibility listener (Fix 4)
+  // ==========================================
+  it('Test 12 — Visibility listener on custom env: detects tab hidden via addVisibilityListener', async () => {
+    const trial = createSampleTrial();
+    const runPromise = controller.runTrial(trial);
+
+    // Simulate tab being hidden in custom environment
+    env.simulateVisibilityChange('hidden');
+
+    env.advanceToStimulusOnset(500);
+    env.tick(200);
+    env.triggerKeydown('Space');
+
+    const result = await runPromise;
+    expect(result.timingMeasurement?.hardwarePrecision.hiddenTabDetected).toBe(true);
   });
 });

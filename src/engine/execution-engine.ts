@@ -26,10 +26,11 @@ export interface SessionContext {
 
 function hasCorrectnessBranching(
   branching: unknown
-): branching is { ifCorrect: string; ifIncorrect: string } {
+): branching is { ifCorrect: string | null; ifIncorrect: string | null } {
   if (!branching || typeof branching !== 'object') return false;
   const b = branching as Record<string, unknown>;
-  return typeof b.ifCorrect === 'string' && typeof b.ifIncorrect === 'string';
+  // Has ifCorrect and ifIncorrect keys (may be null = end session)
+  return 'ifCorrect' in b && 'ifIncorrect' in b;
 }
 
 export class ExecutionEngine {
@@ -88,11 +89,35 @@ export class ExecutionEngine {
 
   /**
    * Validates whether submitted response conforms to trial's allowed input criteria.
+   * null/timeout response is allowed only if the trial can time out.
    */
-  validateResponse(trial: Trial, submittedResponse: string | null): void {
-    if (submittedResponse === null) {
-      // Timeout or null response is allowed as a non-response input
+  validateResponse(
+    trial: Trial,
+    submittedResponse: string | null,
+    timedOut: boolean,
+    reactionTimeMs: number | null
+  ): void {
+    if (submittedResponse === null || timedOut) {
+      // Timeout/null response is only valid if trial supports it
+      if (trial.timingConfig.waitForResponse || trial.timingConfig.responseTimeoutMs === null) {
+        throw new BadRequestError(
+          'A null/timeout response is not allowed for this trial: trial requires a response (waitForResponse=true or no responseTimeoutMs)',
+          'INVALID_RESPONSE'
+        );
+      }
       return;
+    }
+
+    // Cap reactionTimeMs
+    const maxReactionMs =
+      trial.timingConfig.responseTimeoutMs !== null
+        ? trial.timingConfig.responseTimeoutMs + 1000
+        : 600000;
+    if (reactionTimeMs !== null && reactionTimeMs > maxReactionMs) {
+      throw new BadRequestError(
+        `reactionTimeMs ${reactionTimeMs} exceeds maximum allowed ${maxReactionMs}ms for this trial`,
+        'INVALID_RESPONSE'
+      );
     }
 
     const { expectedResponse } = trial;
@@ -114,12 +139,10 @@ export class ExecutionEngine {
   }
 
   /**
-   * Advances the session sequence based on branching (Phase 7), trialOrder (Phase 6), or linear pointer (Phase 3).
+   * Advances the session sequence based on branching (Phase 7) or linear pointer (Phase 3).
    * Precedence:
-   * 1. If current trial has branching -> branching determines next trial based on response correctness.
-   * 2. Otherwise:
-   *    - If randomized session -> follows session.trialOrder
-   *    - If linear session -> follows currentTrial.nextTrialId pointer
+   * 1. If current trial has branching -> branching determines next trial (or null = complete session).
+   * 2. Otherwise: follows currentTrial.nextTrialId pointer or trialOrder for randomized sessions.
    */
   advanceLinearSequence(
     session: SessionContext,
@@ -146,12 +169,29 @@ export class ExecutionEngine {
       );
     }
 
+    const completionMessage =
+      snapshot.completionMessage ??
+      'Thank you for participating! Your responses have been anonymously recorded.';
+
     // 1. Dynamic Conditional Branching (Phase 7): If current trial has branching, it takes precedence
     if (hasCorrectnessBranching(currentTrial.branching)) {
       const targetTrialId =
         isCorrect === true
           ? currentTrial.branching.ifCorrect
           : currentTrial.branching.ifIncorrect;
+
+      // null target = complete the session
+      if (targetTrialId === null) {
+        return {
+          sessionStatus: 'COMPLETED',
+          executionState: 'COMPLETE',
+          nextTrialId: null,
+          nextTrialIndex: session.currentTrialIndex,
+          nextTrial: null,
+          isCompleted: true,
+          completionMessage,
+        };
+      }
 
       const nextTrial = snapshot.trials.find((t) => t.id === targetTrialId);
       if (!nextTrial) {
@@ -161,16 +201,8 @@ export class ExecutionEngine {
         );
       }
 
-      let nextTrialIndex = session.currentTrialIndex + 1;
-      let projectedNextTrialId: string | null = nextTrial.nextTrialId;
-
-      if (session.randomizationEnabled && session.trialOrder && session.trialOrder.length > 0) {
-        const targetPos = session.trialOrder.indexOf(targetTrialId);
-        if (targetPos >= 0) {
-          nextTrialIndex = targetPos;
-          projectedNextTrialId = session.trialOrder[targetPos + 1] ?? null;
-        }
-      }
+      const nextTrialIndex = session.currentTrialIndex + 1;
+      const projectedNextTrialId = nextTrial.nextTrialId;
 
       return {
         sessionStatus: 'IN_PROGRESS',
@@ -196,8 +228,7 @@ export class ExecutionEngine {
           nextTrialIndex: session.currentTrialIndex,
           nextTrial: null,
           isCompleted: true,
-          completionMessage:
-            snapshot.completionMessage ?? 'Thank you for participating! Your responses have been anonymously recorded.',
+          completionMessage,
         };
       }
 
@@ -232,8 +263,7 @@ export class ExecutionEngine {
         nextTrialIndex: session.currentTrialIndex,
         nextTrial: null,
         isCompleted: true,
-        completionMessage:
-          snapshot.completionMessage ?? 'Thank you for participating! Your responses have been anonymously recorded.',
+        completionMessage,
       };
     }
 
@@ -260,7 +290,7 @@ export class ExecutionEngine {
   }
 
   /**
-   * Strips correctResponse from expectedResponse to ensure participant cannot inspect answer.
+   * Strips correctResponse and stimulus.metadata from the trial for participant-facing output.
    */
   stripTrial(
     trial: Trial,
@@ -280,13 +310,30 @@ export class ExecutionEngine {
             evaluationMode: trial.expectedResponse.evaluationMode,
           };
 
+    // Strip stimulus.metadata from participant view
+    const strippedStimulus =
+      trial.stimulus.type === 'text'
+        ? {
+            id: trial.stimulus.id,
+            type: trial.stimulus.type as 'text',
+            content: trial.stimulus.content,
+            styling: trial.stimulus.styling,
+          }
+        : {
+            id: trial.stimulus.id,
+            type: trial.stimulus.type as 'image',
+            url: trial.stimulus.url,
+            altText: trial.stimulus.altText,
+            styling: trial.stimulus.styling,
+          };
+
     return {
       id: trial.id,
       orderIndex: projectedOrderIndex !== undefined ? projectedOrderIndex : trial.orderIndex,
       label: trial.label,
       instructions: trial.instructions,
       fixation: trial.fixation,
-      stimulus: trial.stimulus,
+      stimulus: strippedStimulus,
       timingConfig: trial.timingConfig,
       expectedResponse: strippedExpected,
       nextTrialId: projectedNextTrialId !== undefined ? projectedNextTrialId : trial.nextTrialId,

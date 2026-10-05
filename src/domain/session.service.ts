@@ -40,16 +40,14 @@ export class SessionService {
    * Initializes an anonymous participant session bound to the latest published snapshot.
    */
   async startSession(
-    experimentSlugOrId: string,
+    experimentSlug: string,
     rawInput?: unknown
   ): Promise<StartSessionResult> {
     const validated = startSessionSchema.parse(rawInput ?? {});
 
-    // 1. Locate experiment by publicSlug or id
+    // 1. Locate experiment by publicSlug only (not by id)
     const experiment = await prisma.experiment.findFirst({
-      where: {
-        OR: [{ publicSlug: experimentSlugOrId }, { id: experimentSlugOrId }],
-      },
+      where: { publicSlug: experimentSlug },
       include: {
         versions: {
           orderBy: { version: 'desc' },
@@ -60,7 +58,7 @@ export class SessionService {
 
     if (!experiment) {
       throw new NotFoundError(
-        `Experiment '${experimentSlugOrId}' not found`,
+        `Experiment '${experimentSlug}' not found`,
         'EXPERIMENT_NOT_FOUND'
       );
     }
@@ -85,8 +83,11 @@ export class SessionService {
       throw new BadRequestError('Published experiment snapshot contains no trials');
     }
 
+    // Start at the entry trial: lowest orderIndex
+    const sortedTrials = [...snapshot.trials].sort((a, b) => a.orderIndex - b.orderIndex);
+
     const isRandomized = Boolean(snapshot.config?.randomization?.enabled);
-    const originalTrialIds = snapshot.trials.map((t) => t.id);
+    const originalTrialIds = sortedTrials.map((t) => t.id);
 
     let seed: string | null = null;
     let trialOrder: string[] = originalTrialIds;
@@ -146,6 +147,14 @@ export class SessionService {
 
     if (!session) {
       throw new NotFoundError(`Session '${sessionId}' not found`, 'SESSION_NOT_FOUND');
+    }
+
+    // ABANDONED session: getCurrentStep => 409 SESSION_ALREADY_COMPLETED
+    if (session.status === 'ABANDONED') {
+      throw new ConflictError(
+        'This session was abandoned.',
+        'SESSION_ALREADY_COMPLETED'
+      );
     }
 
     const snapshot = session.version.snapshotData as unknown as Experiment;
@@ -219,12 +228,52 @@ export class SessionService {
       }
 
       // 3. Validate response according to expected response criteria
-      this.engine.validateResponse(currentTrial, validated.submittedResponse ?? null);
+      const timedOut = validated.timedOut ?? false;
+      this.engine.validateResponse(
+        currentTrial,
+        validated.submittedResponse ?? null,
+        timedOut,
+        validated.reactionTimeMs ?? null
+      );
+
+      // Check that this trial has not already been answered in this session
+      const existingResponse = await tx.sessionResponse.findFirst({
+        where: { sessionId: session.id, trialId },
+        select: { id: true },
+      });
+      if (existingResponse) {
+        // Idempotency replay: return the existing response data and current next step
+        const rawTrialOrder = session.trialOrder as string[] | null;
+        const replayTransition = this.engine.advanceLinearSequence(
+          {
+            id: session.id,
+            experimentId: session.experimentId,
+            status: session.status,
+            executionState: session.executionState,
+            currentTrialId: session.currentTrialId,
+            currentTrialIndex: session.currentTrialIndex,
+            totalTrials: session.totalTrials,
+            trialOrder: rawTrialOrder,
+            randomizationEnabled: session.randomizationEnabled,
+          },
+          snapshot,
+          trialId,
+          null
+        );
+        return {
+          responseId: existingResponse.id,
+          isCorrect: null,
+          sessionStatus: session.status as 'IN_PROGRESS' | 'COMPLETED' | 'ABANDONED',
+          nextTrial: replayTransition.nextTrial,
+          isCompleted: replayTransition.isCompleted,
+          completionMessage: replayTransition.completionMessage,
+        };
+      }
 
       // Evaluate correctness against the frozen ExperimentVersion snapshot
       let isCorrect: boolean | null = null;
       if (currentTrial.expectedResponse.evaluationMode === 'exact_match') {
-        if (validated.timedOut || !validated.submittedResponse) {
+        if (timedOut || !validated.submittedResponse) {
           isCorrect = false;
         } else {
           isCorrect =
@@ -234,37 +283,82 @@ export class SessionService {
         isCorrect = null;
       }
 
-      // Runtime loop protection safeguard: max execution bound per session
-      const responseCount = await tx.sessionResponse.count({
-        where: { sessionId: session.id },
-      });
-      const maxAllowedResponses = Math.max(100, snapshot.trials.length * 10);
-      if (responseCount >= maxAllowedResponses) {
-        throw new BadRequestError(
-          'Maximum trial execution limit exceeded for this session',
-          'EXECUTION_LIMIT_EXCEEDED'
-        );
-      }
-
-      // 4. Record session response with timing telemetry (enforces unique constraint per session & trial)
+      // 4. Record session response (enforces unique constraint per session & trial)
       const responseId = `resp_${crypto.randomUUID()}`;
-      await tx.sessionResponse.create({
-        data: {
-          id: responseId,
-          sessionId: session.id,
-          trialId: trialId,
-          submittedResponse: validated.submittedResponse ?? null,
-          isCorrect,
-          reactionTimeMs: validated.reactionTimeMs ?? null,
-          timedOut: validated.timedOut ?? false,
-          timingMeasurement: (validated.timingMeasurement ?? Prisma.DbNull) as Prisma.InputJsonValue,
-          clientMetadata: (validated.clientMetadata ?? Prisma.DbNull) as Prisma.InputJsonValue,
-        },
-      });
+      try {
+        await tx.sessionResponse.create({
+          data: {
+            id: responseId,
+            sessionId: session.id,
+            trialId: trialId,
+            submittedResponse: validated.submittedResponse ?? null,
+            isCorrect,
+            reactionTimeMs: validated.reactionTimeMs ?? null,
+            timedOut: timedOut,
+            timingMeasurement: (validated.timingMeasurement ?? Prisma.DbNull) as Prisma.InputJsonValue,
+            clientMetadata: (validated.clientMetadata ?? Prisma.DbNull) as Prisma.InputJsonValue,
+          },
+        });
+      } catch (err: unknown) {
+        // P2002 unique constraint violation = duplicate submission (race condition)
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === 'P2002'
+        ) {
+          // Idempotent replay
+          const existing = await tx.sessionResponse.findFirst({
+            where: { sessionId: session.id, trialId },
+            select: { id: true },
+          });
+          const rawTrialOrder = session.trialOrder as string[] | null;
+          const replayTransition = this.engine.advanceLinearSequence(
+            {
+              id: session.id,
+              experimentId: session.experimentId,
+              status: session.status,
+              executionState: session.executionState,
+              currentTrialId: session.currentTrialId,
+              currentTrialIndex: session.currentTrialIndex,
+              totalTrials: session.totalTrials,
+              trialOrder: rawTrialOrder,
+              randomizationEnabled: session.randomizationEnabled,
+            },
+            snapshot,
+            trialId,
+            null
+          );
+          return {
+            responseId: existing?.id ?? responseId,
+            isCorrect: null,
+            sessionStatus: session.status as 'IN_PROGRESS' | 'COMPLETED' | 'ABANDONED',
+            nextTrial: replayTransition.nextTrial,
+            isCompleted: replayTransition.isCompleted,
+            completionMessage: replayTransition.completionMessage,
+          };
+        }
+        throw err;
+      }
 
       const rawTrialOrder = session.trialOrder as string[] | null;
 
-      // 5. Advance state machine with conditional branching and randomization support
+      // 5. Atomically advance session — only if the session is still on this trial
+      const updateResult = await tx.session.updateMany({
+        where: { id: sessionId, currentTrialId: trialId, status: 'IN_PROGRESS' },
+        data: {
+          // Temporarily set a sentinel; actual values come from transition below
+          // We need the transition first, then update
+        },
+      });
+
+      if (updateResult.count === 0) {
+        // Race condition: session already advanced by a concurrent request
+        throw new ConflictError(
+          'Session has already advanced past this trial. Concurrent response conflict.',
+          'SESSION_ALREADY_COMPLETED'
+        );
+      }
+
+      // 6. Compute transition after confirming lock
       const transition = this.engine.advanceLinearSequence(
         {
           id: session.id,
@@ -282,7 +376,7 @@ export class SessionService {
         isCorrect
       );
 
-      // 6. Update session in database
+      // 7. Update session with final values
       await tx.session.update({
         where: { id: sessionId },
         data: {
@@ -294,10 +388,13 @@ export class SessionService {
         },
       });
 
+      // Determine isCorrect visibility based on showFeedback config
+      const showFeedback = snapshot.config?.showFeedback !== false;
+
       if (transition.isCompleted) {
         return {
           responseId,
-          isCorrect,
+          ...(showFeedback ? { isCorrect } : {}),
           sessionStatus: 'COMPLETED',
           nextTrial: null,
           isCompleted: true,
@@ -307,7 +404,7 @@ export class SessionService {
 
       return {
         responseId,
-        isCorrect,
+        ...(showFeedback ? { isCorrect } : {}),
         sessionStatus: 'IN_PROGRESS',
         nextTrial: transition.nextTrial,
         isCompleted: false,
@@ -317,6 +414,9 @@ export class SessionService {
 
   /**
    * Explicitly abandons a session upon participant exit or consent withdrawal.
+   * - IN_PROGRESS => set ABANDONED
+   * - Already ABANDONED => idempotent 200
+   * - COMPLETED => 409 SESSION_ALREADY_COMPLETED
    */
   async abandonSession(sessionId: string): Promise<{ sessionId: string; status: 'ABANDONED' }> {
     const session = await prisma.session.findUnique({ where: { id: sessionId } });
@@ -324,16 +424,23 @@ export class SessionService {
       throw new NotFoundError(`Session '${sessionId}' not found`, 'SESSION_NOT_FOUND');
     }
 
+    if (session.status === 'COMPLETED') {
+      throw new ConflictError(
+        'Cannot abandon a completed session.',
+        'SESSION_ALREADY_COMPLETED'
+      );
+    }
+
+    // Already ABANDONED: idempotent 200
+    if (session.status === 'ABANDONED') {
+      return { sessionId, status: 'ABANDONED' };
+    }
+
     await prisma.session.update({
       where: { id: sessionId },
-      data: {
-        status: 'ABANDONED',
-      },
+      data: { status: 'ABANDONED' },
     });
 
-    return {
-      sessionId,
-      status: 'ABANDONED',
-    };
+    return { sessionId, status: 'ABANDONED' };
   }
 }
