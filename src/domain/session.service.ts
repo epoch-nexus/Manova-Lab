@@ -300,65 +300,23 @@ export class SessionService {
           },
         });
       } catch (err: unknown) {
-        // P2002 unique constraint violation = duplicate submission (race condition)
+        // P2002 unique constraint violation = concurrent race lost; pre-check above
+        // handles genuine retries, so arriving here means another request won.
         if (
           err instanceof Prisma.PrismaClientKnownRequestError &&
           err.code === 'P2002'
         ) {
-          // Idempotent replay
-          const existing = await tx.sessionResponse.findFirst({
-            where: { sessionId: session.id, trialId },
-            select: { id: true },
-          });
-          const rawTrialOrder = session.trialOrder as string[] | null;
-          const replayTransition = this.engine.advanceLinearSequence(
-            {
-              id: session.id,
-              experimentId: session.experimentId,
-              status: session.status,
-              executionState: session.executionState,
-              currentTrialId: session.currentTrialId,
-              currentTrialIndex: session.currentTrialIndex,
-              totalTrials: session.totalTrials,
-              trialOrder: rawTrialOrder,
-              randomizationEnabled: session.randomizationEnabled,
-            },
-            snapshot,
-            trialId,
-            null
+          throw new ConflictError(
+            'Session response already recorded for this trial. Concurrent response conflict.',
+            'SESSION_ALREADY_COMPLETED'
           );
-          return {
-            responseId: existing?.id ?? responseId,
-            isCorrect: null,
-            sessionStatus: session.status as 'IN_PROGRESS' | 'COMPLETED' | 'ABANDONED',
-            nextTrial: replayTransition.nextTrial,
-            isCompleted: replayTransition.isCompleted,
-            completionMessage: replayTransition.completionMessage,
-          };
         }
         throw err;
       }
 
       const rawTrialOrder = session.trialOrder as string[] | null;
 
-      // 5. Atomically advance session — only if the session is still on this trial
-      const updateResult = await tx.session.updateMany({
-        where: { id: sessionId, currentTrialId: trialId, status: 'IN_PROGRESS' },
-        data: {
-          // Temporarily set a sentinel; actual values come from transition below
-          // We need the transition first, then update
-        },
-      });
-
-      if (updateResult.count === 0) {
-        // Race condition: session already advanced by a concurrent request
-        throw new ConflictError(
-          'Session has already advanced past this trial. Concurrent response conflict.',
-          'SESSION_ALREADY_COMPLETED'
-        );
-      }
-
-      // 6. Compute transition after confirming lock
+      // 5. Compute transition
       const transition = this.engine.advanceLinearSequence(
         {
           id: session.id,
@@ -376,9 +334,11 @@ export class SessionService {
         isCorrect
       );
 
-      // 7. Update session with final values
-      await tx.session.update({
-        where: { id: sessionId },
+      // 6. Atomically advance session — combines the concurrency lock (WHERE currentTrialId)
+      //    with the actual state update in one round-trip. count=0 means a concurrent
+      //    request already advanced the session past this trial.
+      const updateResult = await tx.session.updateMany({
+        where: { id: sessionId, currentTrialId: trialId, status: 'IN_PROGRESS' },
         data: {
           status: transition.sessionStatus,
           executionState: transition.executionState,
@@ -387,6 +347,13 @@ export class SessionService {
           completedAt: transition.isCompleted ? new Date() : null,
         },
       });
+
+      if (updateResult.count === 0) {
+        throw new ConflictError(
+          'Session has already advanced past this trial. Concurrent response conflict.',
+          'SESSION_ALREADY_COMPLETED'
+        );
+      }
 
       // Determine isCorrect visibility based on showFeedback config
       const showFeedback = snapshot.config?.showFeedback !== false;

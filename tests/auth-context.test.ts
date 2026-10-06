@@ -187,6 +187,7 @@ describe('Batch 9 — User Auth Context & Dynamic Experiment Creation', () => {
             expectedResponse: {
               type: 'keypress',
               allowedKeys: ['Space'],
+              correctResponse: 'Space',
               evaluationMode: 'exact_match',
             },
             nextTrialId: null,

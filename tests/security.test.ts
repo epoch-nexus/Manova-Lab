@@ -208,6 +208,7 @@ describe('Phase 9 — Integration Hardening & Security Test Suite', () => {
         NODE_ENV: 'production',
         DATABASE_URL: 'postgresql://user:pass@localhost:5432/prod_db',
         JWT_SECRET: 'a-very-long-production-grade-cryptographic-secret-256bits',
+        CORS_ORIGIN: 'https://app.manova.labs',
       });
       expect(cfg.NODE_ENV).toBe('production');
       expect(cfg.JWT_SECRET).toBe('a-very-long-production-grade-cryptographic-secret-256bits');

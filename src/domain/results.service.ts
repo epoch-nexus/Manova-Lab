@@ -345,8 +345,8 @@ export class ResultsService {
         MAX(sr."reactionTimeMs") FILTER (WHERE sr."timedOut" = false AND sr."reactionTimeMs" IS NOT NULL AND sr."reactionTimeMs" >= 0)                        AS max_rt,
         STDDEV_SAMP(sr."reactionTimeMs") FILTER (WHERE sr."timedOut" = false AND sr."reactionTimeMs" IS NOT NULL AND sr."reactionTimeMs" >= 0)               AS stddev_rt,
         PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY sr."reactionTimeMs") FILTER (WHERE sr."timedOut" = false AND sr."reactionTimeMs" IS NOT NULL AND sr."reactionTimeMs" >= 0) AS median_rt
-      FROM "SessionResponse" sr
-      JOIN "Session" s ON s."id" = sr."sessionId"
+      FROM "session_responses" sr
+      JOIN "sessions" s ON s."id" = sr."sessionId"
       WHERE s."experimentId" = '${experimentId.replace(/'/g, "''")}'
       ${versionClause}
       ${trialClause}

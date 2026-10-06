@@ -315,14 +315,13 @@ describe('Phase 8 — Researcher Authentication & Authorization', () => {
       expect(res.body.ownerResearcherId).toBe(researcherA.researcherId);
     });
 
-    it("B. Researcher B (non-owner) CANNOT retrieve Researcher A's experiment (403 Forbidden)", async () => {
+    it("B. Researcher B (non-owner) CANNOT retrieve Researcher A's experiment (404 Not Found)", async () => {
       const res = await request(app)
         .get(`/api/v1/experiments/${experimentAId}`)
         .set(researcherB.authHeader);
 
-      expect(res.status).toBe(403);
-      expect(res.body.error.code).toBe('FORBIDDEN');
-      expect(res.body.error.message).toContain('You do not own this experiment');
+      expect(res.status).toBe(404);
+      expect(res.body.error.code).toBe('EXPERIMENT_NOT_FOUND');
     });
 
     it('C. Unauthenticated request to get experiment is rejected (401 Unauthorized)', async () => {
@@ -344,7 +343,7 @@ describe('Phase 8 — Researcher Authentication & Authorization', () => {
       expect(res.body.title).toBe('Updated Title by Owner A');
     });
 
-    it("B. Researcher B (non-owner) CANNOT update Researcher A's experiment (403 Forbidden)", async () => {
+    it("B. Researcher B (non-owner) CANNOT update Researcher A's experiment (404 Not Found)", async () => {
       const res = await request(app)
         .put(`/api/v1/experiments/${experimentAId}`)
         .set(researcherB.authHeader)
@@ -352,17 +351,17 @@ describe('Phase 8 — Researcher Authentication & Authorization', () => {
           title: 'Malicious Update by Non-Owner',
         });
 
-      expect(res.status).toBe(403);
-      expect(res.body.error.code).toBe('FORBIDDEN');
+      expect(res.status).toBe(404);
+      expect(res.body.error.code).toBe('EXPERIMENT_NOT_FOUND');
     });
 
-    it("B. Researcher B (non-owner) CANNOT publish Researcher A's experiment (403 Forbidden)", async () => {
+    it("B. Researcher B (non-owner) CANNOT publish Researcher A's experiment (404 Not Found)", async () => {
       const res = await request(app)
         .post(`/api/v1/experiments/${experimentAId}/publish`)
         .set(researcherB.authHeader);
 
-      expect(res.status).toBe(403);
-      expect(res.body.error.code).toBe('FORBIDDEN');
+      expect(res.status).toBe(404);
+      expect(res.body.error.code).toBe('EXPERIMENT_NOT_FOUND');
     });
 
     it('A. Researcher A (owner) can publish own experiment (200 OK)', async () => {
@@ -374,13 +373,13 @@ describe('Phase 8 — Researcher Authentication & Authorization', () => {
       expect(res.body.status).toBe('PUBLISHED');
     });
 
-    it("B. Researcher B (non-owner) CANNOT delete Researcher A's experiment (403 Forbidden)", async () => {
+    it("B. Researcher B (non-owner) CANNOT delete Researcher A's experiment (404 Not Found)", async () => {
       const res = await request(app)
         .delete(`/api/v1/experiments/${experimentAId}`)
         .set(researcherB.authHeader);
 
-      expect(res.status).toBe(403);
-      expect(res.body.error.code).toBe('FORBIDDEN');
+      expect(res.status).toBe(404);
+      expect(res.body.error.code).toBe('EXPERIMENT_NOT_FOUND');
     });
 
     it('A. Researcher A (owner) can delete own experiment (204 No Content)', async () => {

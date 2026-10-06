@@ -394,19 +394,6 @@ export const publishValidationSchema = z
   })
   .superRefine((val, ctx) => {
     validateTrialGraph(val.trials, ctx);
-
-    if (val.config?.randomization?.enabled) {
-      const hasBranching = val.trials.some(
-        (t) => t.branching !== null && t.branching !== undefined
-      );
-      if (hasBranching) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Randomization cannot be enabled when trials have branching rules',
-          path: ['config', 'randomization', 'enabled'],
-        });
-      }
-    }
   });
 
 export type CreateExperimentInput = z.infer<typeof createExperimentSchema>;

@@ -174,7 +174,7 @@ export class ExperimentService {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
         throw new ConflictError(
           'Resource conflict: one or more unique identifiers or constraints already exist',
-          'EXPERIMENT_ALREADY_PUBLISHED'
+          'INVALID_EXPERIMENT'
         );
       }
       throw err;

@@ -433,6 +433,10 @@ describe('Researcher Experiments API (Phase 2)', () => {
             waitForResponse: false,
           },
           nextTrialId: '00000000-9999-9999-9999-000000000000', // Does not exist
+          // branching with both arms null makes this trial terminal-via-branching,
+          // so the "at least one terminal trial" check passes and the
+          // "nextTrialId does not exist" error surfaces as the first error.
+          branching: { ifCorrect: null, ifIncorrect: null },
           experimentId: brokenPointerExp.body.id,
           stimulus: {
             create: {
@@ -495,6 +499,7 @@ describe('Researcher Experiments API (Phase 2)', () => {
             create: {
               type: 'keypress',
               allowedKeys: ['Space'],
+              correctResponse: 'Space',
               evaluationMode: 'exact_match',
             },
           },
