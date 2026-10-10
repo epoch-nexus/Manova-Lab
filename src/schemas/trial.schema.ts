@@ -89,7 +89,7 @@ export const trialBranchingRuleSchema = correctnessBranchingSchema.nullable().op
 export const trialSchema = z
   .object({
     id: z.string().uuid('Trial id must be a valid UUID'),
-    orderIndex: z.number().int().positive('orderIndex must be a positive integer'),
+    orderIndex: z.number().int().min(0, 'orderIndex must be a non-negative integer'),
     label: z.string().max(200, 'label must be at most 200 characters').nullable().optional(),
     instructions: z.string().max(5000, 'instructions must be at most 5000 characters').nullable().optional(),
     fixation: fixationConfigSchema,

@@ -1,12 +1,24 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import api from '../services/api';
 import FadeIn from '../components/FadeIn';
+import Header from '../components/Header';
 
 export default function ResultsPage() {
+  const { experimentId } = useParams();
+  const activeId = experimentId || 'EXP-882-STRP';
   const [toastMessage, setToastMessage] = useState(null);
-  const [selectedCohort, setSelectedCohort] = useState('Undergrad Normal [A1]');
-  const [dateRange, setDateRange] = useState('Last 30 Days');
+  const [stats, setStats] = useState(null);
+  const selectedCohort = 'Undergrad Normal [A1]';
+  const dateRange = 'Last 30 Days';
+
+  useEffect(() => {
+    if (experimentId && experimentId !== 'mock-id') {
+      api.results.getStats(experimentId)
+        .then(res => setStats(res))
+        .catch(err => console.warn('Could not load remote stats:', err));
+    }
+  }, [experimentId]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -15,16 +27,16 @@ export default function ResultsPage() {
 
   const handleExportCsv = async () => {
     try {
-      showToast("Fetching real CSV from backend...");
-      const blob = await api.results.exportCsv('mock-id');
+      showToast("Fetching CSV from backend...");
+      const blob = await api.results.exportCsv(activeId);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', 'results.csv');
+      link.setAttribute('download', `${activeId}_results.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      showToast("Downloaded EXP-882-STRP_results_full.csv");
+      showToast(`Downloaded ${activeId}_results.csv`);
     } catch (e) {
       console.warn('Real API failed, falling back to mock data', e);
       // Simulated CSV download fallback
@@ -36,16 +48,16 @@ export default function ResultsPage() {
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", "EXP-882-STRP_results_full.csv");
+      link.setAttribute("download", `${activeId}_results.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      showToast("Downloaded Mock EXP-882-STRP_results_full.csv");
+      showToast(`Downloaded ${activeId}_results.csv (local fallback)`);
     }
   };
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col font-sans text-on-surface">
+    <div className="min-h-screen bg-surface flex flex-col font-sans text-on-surface pt-16">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-lg shadow-2xl font-mono text-xs uppercase tracking-wider flex items-center gap-3 border border-slate-700 animate-in fade-in slide-in-from-bottom-3 duration-200">
@@ -54,53 +66,8 @@ export default function ResultsPage() {
         </div>
       )}
 
-      {/* Top Header */}
-      <header className="sticky top-0 left-0 right-0 z-40 bg-surface-container-lowest/90 backdrop-blur-md shadow-xs border-b border-surface-container">
-        <div className="h-16 w-full max-w-7xl mx-auto px-4 sm:px-8 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-6">
-            <Link to="/" className="flex items-center gap-2.5 group">
-              <div className="w-8 h-8 rounded-lg bg-primary-container flex items-center justify-center text-on-primary-container shadow-sm group-hover:scale-105 transition-transform">
-                <span className="material-symbols-outlined text-[19px]">biotech</span>
-              </div>
-              <div className="flex items-baseline tracking-tight font-bold text-lg">
-                <span className="text-on-surface">MANOVA</span>
-                <span className="text-primary-container ml-1">Labs</span>
-              </div>
-            </Link>
-
-            <div className="hidden xl:block h-5 w-[1px] bg-surface-container-highest"></div>
-
-            <nav className="hidden lg:flex items-center gap-1 text-xs font-semibold uppercase tracking-wider">
-              <Link to="/dashboard" className="px-3 py-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded transition-colors">
-                My Experiments
-              </Link>
-              <Link to="/results" className="px-3 py-1.5 bg-surface-container-high text-on-surface rounded">
-                Results &amp; Analytics
-              </Link>
-            </nav>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-surface-container-low border border-surface-container rounded font-mono text-xs">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="text-on-surface uppercase tracking-wider">NODE #884-PX ONLINE</span>
-            </div>
-
-            <div className="hidden md:flex flex-col text-right font-mono">
-              <span className="text-xs text-on-surface font-semibold leading-none">dr.arun@stanford.edu</span>
-              <span className="text-[10px] text-emerald-600 tracking-wider uppercase font-semibold leading-none mt-1">PI PRIVILEGE</span>
-            </div>
-
-            <Link to="/auth" className="hidden sm:flex items-center gap-1 px-3 py-1 bg-surface-container-low hover:bg-surface-container-high font-mono text-xs text-on-surface rounded transition-colors uppercase tracking-wider">
-              <span className="material-symbols-outlined text-[16px]">logout</span> Log Out
-            </Link>
-
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-on-primary">
-              <span className="material-symbols-outlined text-[18px]">person</span>
-            </div>
-          </div>
-        </div>
-      </header>
+      {/* Dynamic Authenticated Header */}
+      <Header current="results" />
 
       {/* Breadcrumb sub-header */}
       <section className="w-full bg-surface-container-low border-b border-surface-container px-4 sm:px-8 py-2.5">
@@ -176,17 +143,21 @@ export default function ResultsPage() {
               </div>
               <div>
                 <div className="flex items-baseline gap-2">
-                  <span className="font-mono text-3xl font-extrabold text-on-surface">840</span>
+                  <span className="font-mono text-3xl font-extrabold text-on-surface">
+                    {stats?.totalSessions ?? 840}
+                  </span>
                   <span className="font-mono text-xs text-on-surface-variant uppercase font-semibold">Subjects</span>
                 </div>
                 <div className="flex items-center gap-1.5 mt-2 font-mono text-xs text-on-surface-variant">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                  <span>812 completed • 28 in-flight</span>
+                  <span>{stats?.completedSessions ?? 812} completed • {stats?.inProgressSessions ?? 28} in-flight</span>
                 </div>
               </div>
               <div className="mt-4 pt-2 border-t border-surface-container flex items-center justify-between font-mono text-xs">
                 <span className="text-on-surface-variant">Retention</span>
-                <span className="text-emerald-700 font-bold">96.7%</span>
+                <span className="text-emerald-700 font-bold">
+                  {stats?.totalSessions ? ((stats.completedSessions / stats.totalSessions) * 100).toFixed(1) + '%' : '96.7%'}
+                </span>
               </div>
             </div>
           </FadeIn>
@@ -200,7 +171,9 @@ export default function ResultsPage() {
               </div>
               <div>
                 <div className="flex items-baseline gap-2">
-                  <span className="font-mono text-3xl font-extrabold text-on-surface">40,320</span>
+                  <span className="font-mono text-3xl font-extrabold text-on-surface">
+                    {stats?.totalResponses ? stats.totalResponses.toLocaleString() : '40,320'}
+                  </span>
                   <span className="font-mono text-xs text-on-surface-variant uppercase font-semibold">Trials</span>
                 </div>
                 <div className="flex items-center gap-1.5 mt-2 font-mono text-xs text-on-surface-variant">
@@ -224,9 +197,13 @@ export default function ResultsPage() {
               </div>
               <div>
                 <div className="flex items-baseline gap-1.5">
-                  <span className="font-mono text-3xl font-extrabold text-on-surface">342.1</span>
+                  <span className="font-mono text-3xl font-extrabold text-on-surface">
+                    {stats?.meanReactionTimeMs ? stats.meanReactionTimeMs.toFixed(1) : '342.1'}
+                  </span>
                   <span className="font-mono text-sm text-primary font-bold">ms</span>
-                  <span className="text-xs text-on-surface-variant ml-1 font-mono">±18.4ms SD</span>
+                  <span className="text-xs text-on-surface-variant ml-1 font-mono">
+                    {stats?.standardDeviationReactionTimeMs ? `±${stats.standardDeviationReactionTimeMs.toFixed(1)}ms SD` : '±18.4ms SD'}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2 mt-2 font-mono text-xs text-on-surface-variant">
                   <span>Cong: <strong className="text-on-surface">312.4ms</strong></span>
@@ -250,7 +227,9 @@ export default function ResultsPage() {
               </div>
               <div>
                 <div className="flex items-baseline gap-2">
-                  <span className="font-mono text-3xl font-extrabold text-on-surface">96.4%</span>
+                  <span className="font-mono text-3xl font-extrabold text-on-surface">
+                    {stats?.accuracyRate ? (stats.accuracyRate * 100).toFixed(1) + '%' : '96.4%'}
+                  </span>
                   <span className="font-mono text-xs text-emerald-700 font-bold">d' = 3.42</span>
                 </div>
                 <div className="flex items-center gap-2 mt-2 font-mono text-xs text-on-surface-variant">

@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import FadeIn from '../components/FadeIn';
 import PipelineGraph from '../components/PipelineGraph';
 import StroopGaussianGraph from '../components/StroopGaussianGraph';
 import NavigationDots from '../components/NavigationDots';
+import Header from '../components/Header';
 
 
 const STROOP_TRIALS = [
@@ -183,13 +185,26 @@ function StreamlinedPipeline() {
 }
 
 export default function LandingPage() {
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+
   // Live Stroop sandbox state
   const [trialIndex, setTrialIndex] = useState(0);
   const [trialCount, setTrialCount] = useState(1);
   const [measuredLatency, setMeasuredLatency] = useState(218.4);
   const [lastAccuracy, setLastAccuracy] = useState('Hit (Correct)');
   const [isHit, setIsHit] = useState(true);
-  const startTimeRef = useRef(performance.now());
+  const startTimeRef = useRef(0);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
+
+  const userEmail = user?.email || '';
+  const displayName = user?.name || userEmail.split('@')[0] || 'Researcher';
+  const userInitial = (displayName || userEmail).charAt(0).toUpperCase() || 'R';
 
   useEffect(() => {
     startTimeRef.current = performance.now();
@@ -213,53 +228,11 @@ export default function LandingPage() {
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
       {/* Left-sidebar vertical section navigation */}
       <NavigationDots />
-      {/* Navigation Header */}
-      <header className="w-full bg-white/85 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-50 transition-all duration-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-8">
-            <Link to="/" className="flex items-center gap-2.5 group">
-              <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white shadow-sm transition-transform duration-200 group-hover:scale-105">
-                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24">
-                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-                </svg>
-              </div>
-              <span className="font-bold text-lg tracking-tight text-slate-900">
-                Manova <span className="text-emerald-600">Labs</span>
-              </span>
-            </Link>
-
-            <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
-              <a className="hover:text-emerald-600 transition-colors whitespace-nowrap" href="#architecture">Product</a>
-              <a className="hover:text-emerald-600 transition-colors whitespace-nowrap" href="#capabilities">Features</a>
-              <a className="hover:text-emerald-600 transition-colors whitespace-nowrap" href="#pipeline">How It Works</a>
-              <Link to="/science" className="hover:text-emerald-600 transition-colors whitespace-nowrap flex items-center gap-1">
-                <span>Architecture</span>
-                <span className="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold">Spec</span>
-              </Link>
-              <a className="hover:text-emerald-600 transition-colors whitespace-nowrap" href="#analytics">Analytics</a>
-              <a className="hover:text-emerald-600 transition-colors whitespace-nowrap" href="#sandbox">Demo</a>
-            </nav>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Link to="/auth" className="hidden sm:inline-flex text-sm font-medium text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg transition-colors">
-              Login
-            </Link>
-            <Link to="/dashboard" className="hidden sm:inline-flex text-sm font-medium text-slate-700 hover:text-emerald-600 border border-slate-200 bg-white hover:border-emerald-200 px-3.5 py-1.5 rounded-lg transition-colors shadow-2xs">
-              Dashboard
-            </Link>
-            <Link to="/builder" className="text-sm font-semibold px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-sm hover:shadow-emerald-200 flex items-center gap-1.5 whitespace-nowrap">
-              <span>Create Experiment</span>
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                <path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" strokeLinecap="round" strokeLinejoin="round"></path>
-              </svg>
-            </Link>
-          </div>
-        </div>
-      </header>
+      {/* Minimal Floating Navigation Bar */}
+      <Header />
 
       {/* Hero Section */}
-      <main id="hero" className="flex-grow relative">
+      <main id="hero" className="flex-grow relative pt-20">
         {/* Glow ambient background elements */}
         <div className="absolute inset-0 pointer-events-none select-none -z-10 overflow-hidden">
           <div className="absolute -top-36 left-1/2 -translate-x-1/2 w-[1300px] h-[680px] cloud-gradient rounded-full blur-3xl opacity-90"></div>

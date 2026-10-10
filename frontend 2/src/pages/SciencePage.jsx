@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import FadeIn from '../components/FadeIn';
+import Header from '../components/Header';
 
 export default function SciencePage() {
   const [activeStep, setActiveStep] = useState(4);
   const [isSimulating, setIsSimulating] = useState(false);
-  const [copiedCode, setCopiedCode] = useState(false);
 
   const simulateHardwareImpulse = () => {
     setIsSimulating(true);
@@ -20,226 +20,192 @@ export default function SciencePage() {
     }, 280);
   };
 
-  const copyCode = () => {
-    setCopiedCode(true);
-    setTimeout(() => setCopiedCode(false), 2000);
-  };
-
   const sampleTrials = [
-    { id: 'TR-01', stim: 'STROOP_CRTL_01', fix: '500.000 ms', onset: '506.944 ms', latency: '241.138 ms', acc: 'CORRECT (1.0)', stream: 'ptp-hardware-sync' },
-    { id: 'TR-02', stim: 'STROOP_INCG_02', fix: '500.000 ms', onset: '506.942 ms', latency: '312.491 ms', acc: 'CORRECT (1.0)', stream: 'ptp-hardware-sync' },
-    { id: 'TR-03', stim: 'STROOP_CONG_03', fix: '500.000 ms', onset: '506.945 ms', latency: '219.082 ms', acc: 'CORRECT (1.0)', stream: 'ptp-hardware-sync' },
-    { id: 'TR-04', stim: 'STROOP_INCG_04', fix: '500.000 ms', onset: '506.944 ms', latency: '348.815 ms', acc: 'CORRECT (1.0)', stream: 'ptp-hardware-sync' },
-    { id: 'TR-05', stim: 'STROOP_CRTL_05', fix: '500.000 ms', onset: '506.946 ms', latency: '228.452 ms', acc: 'CORRECT (1.0)', stream: 'ptp-hardware-sync' },
+    { id: 'TR-01', stim: 'STROOP_CRTL_01', fix: '500.000 ms', onset: '506.944 ms', latency: '241.138 ms', acc: 'Correct', stream: 'ptp-hardware-sync' },
+    { id: 'TR-02', stim: 'STROOP_INCG_02', fix: '500.000 ms', onset: '506.942 ms', latency: '312.491 ms', acc: 'Correct', stream: 'ptp-hardware-sync' },
+    { id: 'TR-03', stim: 'STROOP_CONG_03', fix: '500.000 ms', onset: '506.945 ms', latency: '219.082 ms', acc: 'Correct', stream: 'ptp-hardware-sync' },
+    { id: 'TR-04', stim: 'STROOP_INCG_04', fix: '500.000 ms', onset: '506.944 ms', latency: '348.815 ms', acc: 'Correct', stream: 'ptp-hardware-sync' },
+    { id: 'TR-05', stim: 'STROOP_CRTL_05', fix: '500.000 ms', onset: '506.946 ms', latency: '228.452 ms', acc: 'Correct', stream: 'ptp-hardware-sync' },
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
-      {/* Top Application Header */}
-      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <Link to="/landing" className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white shadow-sm">
-                <span className="material-symbols-outlined text-[18px]">biotech</span>
-              </div>
-              <div className="flex items-baseline tracking-tight">
-                <span className="font-bold text-lg text-slate-900">MANOVA</span>
-                <span className="font-bold text-lg text-emerald-600 ml-1">Labs</span>
-              </div>
-            </Link>
-
-            <nav className="hidden md:flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-slate-600">
-              <Link to="/dashboard" className="px-3 py-1.5 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors">
-                My Experiments
-              </Link>
-              <Link to="/builder" className="px-3 py-1.5 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors">
-                Protocol Builder
-              </Link>
-              <Link to="/science" className="px-3 py-1.5 bg-slate-200 text-slate-900 rounded-lg transition-colors">
-                Telemetry &amp; Streams
-              </Link>
-              <Link to="/results" className="px-3 py-1.5 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors">
-                Results
-              </Link>
-              <Link to="/landing" className="px-3 py-1.5 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors">
-                Documentation
-              </Link>
-            </nav>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-slate-100 rounded-full border border-slate-200 text-xs font-mono">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="text-slate-700 font-semibold">NODE #884-PX ONLINE</span>
-            </div>
-            <div className="hidden md:flex flex-col text-right text-xs">
-              <span className="font-semibold text-slate-900">dr.arun@stanford.edu</span>
-              <span className="text-[10px] text-emerald-600 font-mono font-bold">PI PRIVILEGE</span>
-            </div>
-            <Link to="/auth" className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1">
-              <span className="material-symbols-outlined text-[16px]">logout</span>
-              Log Out
-            </Link>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-emerald-500 selection:text-white pt-16">
+      {/* Header */}
+      <Header current="science" />
 
       {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      <main className="max-w-6xl mx-auto px-6 py-12 space-y-12">
         
-        {/* Section Sub-bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-200 gap-4">
-          <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[11px] font-mono font-bold uppercase tracking-wider">
-              SECTION 04
-            </span>
-            <span className="text-xs font-mono text-slate-500 font-semibold">
-              HARDWARE-SYNCHRONIZED TIMING ARCHITECTURE • REVISION 2.4.2
-            </span>
+        {/* Top Breadcrumb & Actions Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-slate-200/80 gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xs uppercase tracking-wider text-slate-500 font-medium">Architecture Spec</span>
+              <span className="text-slate-300">•</span>
+              <span className="text-xs font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-semibold">
+                Revision 2.4.2
+              </span>
+            </div>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+              High-Precision Telemetry &amp; Timing Architecture
+            </h1>
           </div>
-          <div className="flex items-center gap-2">
-            <button className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 shadow-xs transition-colors">
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-medium text-slate-700 shadow-2xs transition-colors"
+            >
               <span className="material-symbols-outlined text-[16px]">download</span>
-              EXPORT TELEMETRY RAW DATA
+              <span>Export Raw Telemetry</span>
             </button>
-            <button 
+            <button
+              type="button"
               onClick={simulateHardwareImpulse}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold text-white shadow-xs transition-colors"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold text-white shadow-2xs transition-colors"
             >
               <span className="material-symbols-outlined text-[16px]">refresh</span>
-              RE-CALIBRATE ENGINE
+              <span>Calibrate Engine</span>
             </button>
           </div>
         </div>
 
-        {/* Title & Description */}
-        <FadeIn className="space-y-3">
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
-            High-Precision Telemetry &amp; Timestamp Architecture
-          </h1>
-          <p className="text-base text-slate-600 max-w-4xl leading-relaxed">
-            Deterministic sub-millisecond psychophysics measurement in standard web runtime environments using synchronized double-buffered{' '}
-            <code className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono text-xs text-emerald-700">requestAnimationFrame</code>{' '}
-            event-scheduling paired with{' '}
-            <code className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono text-xs text-emerald-700">performance.now()</code>{' '}
-            monotonic hardware clocks.
+        {/* Overview Description */}
+        <FadeIn className="space-y-2">
+          <p className="text-base text-slate-600 max-w-3xl leading-relaxed">
+            Deterministic sub-millisecond psychophysics measurement in modern web runtime environments. Uses double-buffered{' '}
+            <code className="px-1.5 py-0.5 rounded bg-slate-100 font-mono text-xs text-slate-800">requestAnimationFrame</code>{' '}
+            render loops paired with{' '}
+            <code className="px-1.5 py-0.5 rounded bg-slate-100 font-mono text-xs text-slate-800">performance.now()</code>{' '}
+            monotonic hardware clocks to eliminate OS scheduling jitter.
           </p>
         </FadeIn>
 
-        {/* 4 Metric Badges in Card */}
-        <FadeIn delay={100} className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm">
-          <div>
-            <div className="text-xs font-mono uppercase tracking-wider text-slate-500">Clock Resolution</div>
-            <div className="text-2xl sm:text-3xl font-extrabold font-mono text-slate-900 mt-1">5.0 µs</div>
-            <div className="text-xs text-slate-500 mt-0.5">DOMHighResTimeStamp baseline</div>
+        {/* 4 Benchmark KPI Metrics Grid */}
+        <FadeIn delay={100} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+            <span className="text-xs uppercase tracking-wider text-slate-500 font-medium block">Clock Resolution</span>
+            <div className="text-2xl font-semibold font-mono text-slate-900 mt-2">5.0 µs</div>
+            <span className="text-xs text-slate-500 mt-1 block">DOMHighResTimeStamp baseline</span>
           </div>
-          <div>
-            <div className="text-xs font-mono uppercase tracking-wider text-slate-500">Target Screen Frame</div>
-            <div className="text-2xl sm:text-3xl font-extrabold font-mono text-slate-900 mt-1">6.944 ms</div>
-            <div className="text-xs text-slate-500 mt-0.5">144 Hz empirical refresh interval</div>
+
+          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+            <span className="text-xs uppercase tracking-wider text-slate-500 font-medium block">Target Screen Frame</span>
+            <div className="text-2xl font-semibold font-mono text-slate-900 mt-2">6.944 ms</div>
+            <span className="text-xs text-slate-500 mt-1 block">144 Hz empirical refresh interval</span>
           </div>
-          <div>
-            <div className="text-xs font-mono uppercase tracking-wider text-slate-500">Max Measured Jitter</div>
-            <div className="text-2xl sm:text-3xl font-extrabold font-mono text-emerald-600 mt-1">± 0.082 ms</div>
-            <div className="text-xs text-slate-500 mt-0.5">Across 50,000 empirical trials</div>
+
+          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+            <span className="text-xs uppercase tracking-wider text-slate-500 font-medium block">Max Measured Jitter</span>
+            <div className="text-2xl font-semibold font-mono text-emerald-600 mt-2">± 0.082 ms</div>
+            <span className="text-xs text-slate-500 mt-1 block">Across 50,000 empirical trials</span>
           </div>
-          <div>
-            <div className="text-xs font-mono uppercase tracking-wider text-slate-500">Input Latency Floor</div>
-            <div className="text-2xl sm:text-3xl font-extrabold font-mono text-slate-900 mt-1">0.120 ms</div>
-            <div className="text-xs text-slate-500 mt-0.5">Keyboard raw event dispatch</div>
+
+          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+            <span className="text-xs uppercase tracking-wider text-slate-500 font-medium block">Input Latency Floor</span>
+            <div className="text-2xl font-semibold font-mono text-slate-900 mt-2">0.120 ms</div>
+            <span className="text-xs text-slate-500 mt-1 block">Keyboard raw event dispatch</span>
           </div>
         </FadeIn>
 
-        {/* Visual Proof / Hardware Verification Diagrams */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <FadeIn delay={100} className="md:col-span-2 bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex flex-col justify-between">
+        {/* Figures 0.1 & 0.2: Balanced 2-Column Minimal Card Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <FadeIn delay={150} className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-mono uppercase tracking-wider text-slate-500">FIG 0.1 // PHYSICAL DISPLAY TIMING CHAIN</span>
-                <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                  CORRELATION FACTOR: r = 0.9994
+                <span className="text-xs uppercase tracking-wider text-slate-500 font-medium">FIG 0.1 // Display Timing Chain</span>
+                <span className="text-[11px] font-mono font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  r = 0.9994
                 </span>
               </div>
-              <h3 className="text-lg font-bold text-slate-900">Sub-Millisecond Temporal Verification Chain</h3>
-              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                To eliminate browser rendering assumptions, Manova Labs bench-calibrates software timestamps against physical photodiode sensors positioned directly over high-speed OLED panels. A custom FPGA capture rig records the exact moment of photon emission on phosphor pixels and matches the WebGL/Paint event stamp.
+              <h2 className="text-lg font-semibold tracking-tight text-slate-900">
+                Sub-Millisecond Temporal Verification Chain
+              </h2>
+              <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
+                Software timestamps are bench-calibrated against external physical photodiode sensors positioned over OLED panels. FPGA capture records the exact moment of photon emission to verify the WebGL paint event.
               </p>
             </div>
-            
-            {/* Diagram Display Box */}
-            <div className="mt-4 p-4 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 font-mono text-xs flex flex-col gap-3">
-              <div className="flex items-center justify-between text-[11px] text-slate-400 border-b border-slate-800 pb-2">
+
+            {/* Minimal Line Graph */}
+            <div className="mt-5 p-4 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 font-mono text-xs flex flex-col gap-2.5">
+              <div className="flex items-center justify-between text-[11px] text-slate-400 border-b border-slate-800/80 pb-2">
                 <span>SIGNAL: CH1 [PHOTO-DETECTOR] vs CH2 [PTP FRAME PULSE]</span>
-                <span className="text-emerald-400">HARDWARE LOCK: ACTIVE</span>
+                <span className="text-emerald-400 text-[10px]">SYNC LOCKED</span>
               </div>
-              <div className="h-28 flex items-center justify-center relative overflow-hidden">
-                <svg className="w-full h-full text-emerald-400" viewBox="0 0 500 100" fill="none">
-                  <path d="M 0,80 L 100,80 L 105,20 L 220,20 L 225,80 L 340,80 L 345,20 L 460,20 L 465,80 L 500,80" stroke="currentColor" strokeWidth="2.5" />
-                  <path d="M 0,85 L 100,85 L 106,25 L 220,25 L 226,85 L 340,85 L 346,25 L 460,25 L 466,85 L 500,85" stroke="#38bdf8" strokeWidth="1.5" strokeDasharray="4 2" />
+              <div className="h-24 flex items-center justify-center relative overflow-hidden">
+                <svg className="w-full h-full text-emerald-400" viewBox="0 0 500 80" fill="none">
+                  <path d="M 0,65 L 100,65 L 105,15 L 220,15 L 225,65 L 340,65 L 345,15 L 460,15 L 465,65 L 500,65" stroke="currentColor" strokeWidth="2" />
+                  <path d="M 0,70 L 100,70 L 106,20 L 220,20 L 226,70 L 340,70 L 346,20 L 460,20 L 466,70 L 500,70" stroke="#38bdf8" strokeWidth="1.5" strokeDasharray="4 2" />
                 </svg>
-                <div className="absolute right-4 bottom-2 text-[10px] text-slate-400">
-                  PHOTON RISE TIME: 0.18 ms | SAMPLING: 100 kHz
-                </div>
+              </div>
+              <div className="text-[10px] text-slate-400 flex justify-between pt-1 border-t border-slate-800/60">
+                <span>Photon Rise: 0.18 ms</span>
+                <span>Sampling: 100 kHz</span>
               </div>
             </div>
           </FadeIn>
 
-          <FadeIn delay={200} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex flex-col justify-between">
+          <FadeIn delay={200} className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm flex flex-col justify-between">
             <div>
-              <div className="text-xs font-mono uppercase tracking-wider text-slate-500 mb-2">FIG 0.2 // STIMULUS ONSET SPECTRUM</div>
-              <h3 className="text-lg font-bold text-slate-900">Phosphor Rise Time</h3>
-              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                Pixel transition curves from 0% to 90% luminance measured via photodiode. Raw visual trigger occurs before human perceptual threshold.
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs uppercase tracking-wider text-slate-500 font-medium">FIG 0.2 // Stimulus Onset Spectrum</span>
+                <span className="text-[11px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                  Calibrated
+                </span>
+              </div>
+              <h2 className="text-lg font-semibold tracking-tight text-slate-900">
+                Phosphor Luminance Rise Time
+              </h2>
+              <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
+                Pixel transition curves from 0% to 90% luminance measured via photodiode. Raw visual trigger occurs before human perceptual detection thresholds.
               </p>
             </div>
 
-            <div className="mt-4 p-4 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono text-slate-300 space-y-2">
-              <div className="flex justify-between">
-                <span className="text-slate-400">Real-Time Sensor Rise:</span>
-                <span className="text-emerald-400 font-bold">0.18 ms</span>
+            <div className="mt-5 p-4 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono text-slate-700 space-y-2">
+              <div className="flex justify-between items-center py-0.5">
+                <span className="text-slate-500">Real-Time Sensor Rise</span>
+                <span className="text-slate-900 font-semibold">0.18 ms</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Display Engine Lag:</span>
-                <span className="text-sky-400 font-bold">0.09 ms</span>
+              <div className="flex justify-between items-center py-0.5 border-t border-slate-200/60">
+                <span className="text-slate-500">Display Engine Lag</span>
+                <span className="text-slate-900 font-semibold">0.09 ms</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Jitter Variance:</span>
-                <span className="text-emerald-400 font-bold">±0.002 ms</span>
+              <div className="flex justify-between items-center py-0.5 border-t border-slate-200/60">
+                <span className="text-slate-500">Jitter Variance</span>
+                <span className="text-emerald-700 font-semibold">± 0.002 ms</span>
               </div>
-              <div className="flex justify-between border-t border-slate-800 pt-2">
-                <span className="text-slate-400">NIST Atomic Offset:</span>
-                <span className="text-emerald-400 font-bold">&lt; 0.001 ms</span>
+              <div className="flex justify-between items-center py-0.5 border-t border-slate-200/60">
+                <span className="text-slate-500">Atomic PTP Offset</span>
+                <span className="text-emerald-700 font-semibold">&lt; 0.001 ms</span>
               </div>
             </div>
           </FadeIn>
         </div>
 
-        {/* Core Engineering Foundations (4 Cards) */}
-        <div>
-          <FadeIn className="flex items-center gap-2 mb-4">
-            <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
-            <h2 className="text-base font-bold font-mono uppercase tracking-wider text-slate-700">
-              Core Engineering Foundations
-            </h2>
-          </FadeIn>
+        {/* Core Engineering Foundations: 2-Column Responsive Card Grid */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <span className="text-xs uppercase tracking-wider text-slate-500 font-medium">
+              Principles &amp; Foundations
+            </span>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Card 1 */}
-            <FadeIn delay={100} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-3">
+            {/* Foundation 1 */}
+            <FadeIn delay={100} className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-mono text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded">
-                  FOUNDATION #01
+                <span className="text-xs font-mono text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/60">
+                  Principle 01
                 </span>
                 <span className="text-xs font-mono text-slate-400">Double-rAF Scheduling</span>
               </div>
-              <h3 className="text-base font-bold text-slate-900">RequestAnimationFrame Frame Paint Synchronization</h3>
+              <h3 className="text-base font-semibold text-slate-900">
+                Frame Paint Synchronization
+              </h3>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Prevents premature frame execution. Rather than scheduling stimuli in standard setTimeout, Manova uses nested requestAnimationFrame callbacks to guarantee the exact moment of buffer flip to the GPU.
+                Rather than scheduling stimuli via setTimeout, nested requestAnimationFrame callbacks guarantee the exact moment of buffer swap to the GPU.
               </p>
-              <pre className="p-3 bg-slate-950 text-slate-200 rounded-xl text-[11px] font-mono overflow-x-auto border border-slate-800">
-{`// Frame paint sync double-buffer queue
-requestAnimationFrame(() => {
+              <pre className="p-3 bg-slate-900 text-slate-200 rounded-lg text-[11px] font-mono overflow-x-auto border border-slate-800">
+{`requestAnimationFrame(() => {
   requestAnimationFrame((timestamp) => {
     stimulus.onsetTimestamp = timestamp;
     renderTargetWebGL(stimulus.id);
@@ -248,138 +214,143 @@ requestAnimationFrame(() => {
               </pre>
             </FadeIn>
 
-            {/* Card 2 */}
-            <FadeIn delay={200} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-3">
+            {/* Foundation 2 */}
+            <FadeIn delay={150} className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-mono text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded">
-                  FOUNDATION #02
+                <span className="text-xs font-mono text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/60">
+                  Principle 02
                 </span>
-                <span className="text-xs font-mono text-slate-400">High-Res Hardware Timer</span>
+                <span className="text-xs font-mono text-slate-400">Monotonic Epoch</span>
               </div>
-              <h3 className="text-base font-bold text-slate-900">Monotonic Clock Epoch (performance.now())</h3>
+              <h3 className="text-base font-semibold text-slate-900">
+                Hardware Clock Isolation
+              </h3>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Eliminates OS clock drift and NTP step jumps. All timestamps originate from the hardware monotonic crystal clock, independent of system wall time changes.
+                Eliminates OS clock drift and NTP step adjustments. Timestamps originate from the hardware monotonic crystal clock via performance.now().
               </p>
-              <pre className="p-3 bg-slate-950 text-slate-200 rounded-xl text-[11px] font-mono overflow-x-auto border border-slate-800">
-{`// High-resolution monotonic baseline
-const onset = performance.now();
-// Event callback directly receives high-precision DOMHighResTimeStamp
+              <pre className="p-3 bg-slate-900 text-slate-200 rounded-lg text-[11px] font-mono overflow-x-auto border border-slate-800">
+{`const onset = performance.now();
+// Callback receives raw DOMHighResTimeStamp
 const rt = event.timeStamp - onset;`}
               </pre>
             </FadeIn>
 
-            {/* Card 3 */}
-            <FadeIn delay={300} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-3">
+            {/* Foundation 3 */}
+            <FadeIn delay={200} className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-mono text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded">
-                  FOUNDATION #03
+                <span className="text-xs font-mono text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/60">
+                  Principle 03
                 </span>
                 <span className="text-xs font-mono text-slate-400">Formal Definition</span>
               </div>
-              <h3 className="text-base font-bold text-slate-900">Reaction Time (RT) Computation Formula</h3>
+              <h3 className="text-base font-semibold text-slate-900">
+                Reaction Time Formula
+              </h3>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Reaction Time is calculated from the physical frame paint completion to the exact keyboard raw interrupt dispatch. Zero synthetic delays or main-thread queue biases.
+                Calculated from physical frame paint completion to raw keyboard interrupt dispatch. No synthetic delays or queue delays.
               </p>
-              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center font-mono text-sm font-bold text-emerald-900">
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg text-center font-mono text-xs font-bold text-slate-800">
                 RT = event.timeStamp - stimulus.onsetTimestamp
               </div>
-              <p className="text-[11px] text-slate-500 text-center">
-                Verified zero negative RTs; strict sub-frame timeout evaluation
-              </p>
+              <span className="text-[11px] text-slate-500 block text-center">
+                Sub-frame timeout precision verified
+              </span>
             </FadeIn>
 
-            {/* Card 4 */}
-            <FadeIn delay={400} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-3">
+            {/* Foundation 4 */}
+            <FadeIn delay={250} className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-mono text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded">
-                  FOUNDATION #04
+                <span className="text-xs font-mono text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/60">
+                  Principle 04
                 </span>
-                <span className="text-xs font-mono text-slate-400">Decoded Texture Memory</span>
+                <span className="text-xs font-mono text-slate-400">Texture Cache</span>
               </div>
-              <h3 className="text-base font-bold text-slate-900">Zero-Latency Stimulus Preloading</h3>
+              <h3 className="text-base font-semibold text-slate-900">
+                Zero-Latency Preloading
+              </h3>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Images, text glyphs, and audio buffers are pre-decoded into GPU texture memory prior to trial fixation onset. No on-demand I/O or texture uploads interrupt execution.
+                Images, text glyphs, and audio buffers are pre-decoded into GPU texture memory prior to trial fixation onset to avoid runtime I/O stutter.
               </p>
-              <pre className="p-3 bg-slate-950 text-slate-200 rounded-xl text-[11px] font-mono overflow-x-auto border border-slate-800">
+              <pre className="p-3 bg-slate-900 text-slate-200 rounded-lg text-[11px] font-mono overflow-x-auto border border-slate-800">
 {`await imageBitmap.decode(); // GPU VRAM cache
-audioContext.decodeAudioData(buffer); // Low-latency buffer`}
+audioContext.decodeAudioData(buffer);`}
               </pre>
             </FadeIn>
           </div>
         </div>
 
-        {/* Precision Diagnostics Subsystem (Live Monotonic Core) */}
-        <FadeIn className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-6">
+        {/* Precision Diagnostics Subsystem */}
+        <FadeIn delay={100} className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-4">
             <div>
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-emerald-600 text-[20px]">monitor_heart</span>
-                <h3 className="text-lg font-bold text-slate-900">Precision Diagnostics Subsystem (Live Monotonic Core)</h3>
-              </div>
+              <h2 className="text-lg font-semibold tracking-tight text-slate-900">
+                Precision Diagnostics Subsystem
+              </h2>
               <p className="text-xs text-slate-500 font-mono mt-0.5">
-                HOST TELEMETRY SINK // LOCAL HARDWARE CORE BUFFER
+                HOST TELEMETRY SINK // HARDWARE RUNTIME CORE
               </p>
             </div>
             <button
+              type="button"
               onClick={simulateHardwareImpulse}
               disabled={isSimulating}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold text-white shadow-xs transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold text-white shadow-2xs transition-colors disabled:opacity-50 cursor-pointer"
             >
               <span className="material-symbols-outlined text-[16px]">play_circle</span>
-              {isSimulating ? 'SIMULATING RUN...' : 'SIMULATE HARDWARE IMPULSE TRIAL'}
+              <span>{isSimulating ? 'Simulating Run...' : 'Simulate Impulse Trial'}</span>
             </button>
           </div>
 
           {/* Diagnostic Metrics Strip */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
-              <div className="text-[11px] font-mono text-slate-500">CURRENT DISPLAY REFRESH</div>
-              <div className="text-xl font-extrabold font-mono text-slate-900 mt-1">144.03 Hz</div>
-              <div className="text-[10px] text-emerald-600 font-mono font-medium">±0.002ms jitter delta</div>
+            <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
+              <span className="text-[11px] uppercase tracking-wider text-slate-500 font-medium block">Display Refresh</span>
+              <div className="text-xl font-bold font-mono text-slate-900 mt-1">144.03 Hz</div>
+              <span className="text-[10px] text-emerald-700 font-mono font-medium block mt-0.5">± 0.002 ms jitter</span>
             </div>
-            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
-              <div className="text-[11px] font-mono text-slate-500">FRAME PERIOD ESTIMATE</div>
-              <div className="text-xl font-extrabold font-mono text-slate-900 mt-1">6.94 ms</div>
-              <div className="text-[10px] text-slate-500 font-mono">Target: 6.944 ms</div>
+            <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
+              <span className="text-[11px] uppercase tracking-wider text-slate-500 font-medium block">Frame Period</span>
+              <div className="text-xl font-bold font-mono text-slate-900 mt-1">6.94 ms</div>
+              <span className="text-[10px] text-slate-500 font-mono block mt-0.5">Target: 6.944 ms</span>
             </div>
-            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
-              <div className="text-[11px] font-mono text-slate-500">INPUT POLLING JITTER</div>
-              <div className="text-xl font-extrabold font-mono text-slate-900 mt-1">0.12 ms</div>
-              <div className="text-[10px] text-emerald-600 font-mono font-medium">Sub-frame resolution OK</div>
+            <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
+              <span className="text-[11px] uppercase tracking-wider text-slate-500 font-medium block">Input Polling</span>
+              <div className="text-xl font-bold font-mono text-slate-900 mt-1">0.12 ms</div>
+              <span className="text-[10px] text-emerald-700 font-mono font-medium block mt-0.5">Sub-frame resolution</span>
             </div>
-            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
-              <div className="text-[11px] font-mono text-slate-500">TRIALS PROCESSED TODAY</div>
-              <div className="text-xl font-extrabold font-mono text-slate-900 mt-1">48 / 50</div>
-              <div className="text-[10px] text-emerald-600 font-mono font-medium">Zero missed frames</div>
+            <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
+              <span className="text-[11px] uppercase tracking-wider text-slate-500 font-medium block">Processed Trials</span>
+              <div className="text-xl font-bold font-mono text-slate-900 mt-1">48 / 50</div>
+              <span className="text-[10px] text-emerald-700 font-mono font-medium block mt-0.5">Zero dropped frames</span>
             </div>
           </div>
 
-          {/* 5-Step Pipeline Progress Flow */}
+          {/* 5-Step Pipeline Flow */}
           <div className="space-y-2">
-            <div className="text-xs font-mono uppercase tracking-wider text-slate-500 font-bold">
-              EXECUTION PIPELINE STEP-BY-STEP BREAKDOWN
-            </div>
+            <span className="text-xs uppercase tracking-wider text-slate-500 font-medium block">
+              Step-by-Step Execution Sequence
+            </span>
             <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
               {[
-                { step: '01', title: 'Fixation Cross Render', time: '0.000 ms', sub: 'Pre-drawn in memory' },
-                { step: '02', title: 'rAF Frame Scheduled', time: '+6.944 ms', sub: 'GPU swap buffer' },
-                { step: '03', title: 'Stimulus GPU Rasterized', time: '+6.982 ms', sub: 'Onset stamped' },
-                { step: '04', title: 'Participant Keypress', time: '+248.120 ms', sub: 'Keyboard hardware int' },
-                { step: '05', title: 'Evaluated RT', time: '241.138 ms', sub: 'Status: LOCKED OK' },
+                { step: '01', title: 'Fixation Render', time: '0.000 ms', sub: 'Pre-drawn in memory' },
+                { step: '02', title: 'rAF Frame Queued', time: '+6.944 ms', sub: 'GPU swap buffer' },
+                { step: '03', title: 'Stimulus Rasterized', time: '+6.982 ms', sub: 'Onset stamped' },
+                { step: '04', title: 'Participant Keypress', time: '+248.120 ms', sub: 'Hardware interrupt' },
+                { step: '05', title: 'Evaluated RT', time: '241.138 ms', sub: 'Zero latency lag' },
               ].map((s, idx) => (
                 <div 
                   key={s.step} 
-                  className={`p-3 rounded-xl border text-xs transition-all ${
+                  className={`p-3 rounded-lg border text-xs transition-all ${
                     idx + 1 === activeStep
-                      ? 'bg-emerald-50 border-emerald-400 shadow-sm'
+                      ? 'bg-emerald-50/70 border-emerald-400 ring-1 ring-emerald-400/30'
                       : 'bg-slate-50 border-slate-200'
                   }`}
                 >
                   <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 mb-1">
                     <span>STEP {s.step}</span>
-                    <span className="font-bold text-emerald-600">{s.time}</span>
+                    <span className="font-semibold text-emerald-700">{s.time}</span>
                   </div>
-                  <div className="font-semibold text-slate-800 text-[11px]">{s.title}</div>
+                  <div className="font-semibold text-slate-900 text-[11px]">{s.title}</div>
                   <div className="text-[10px] text-slate-500 mt-0.5">{s.sub}</div>
                 </div>
               ))}
@@ -388,16 +359,18 @@ audioContext.decodeAudioData(buffer); // Low-latency buffer`}
         </FadeIn>
 
         {/* Live Session Trial Telemetry Ledger */}
-        <FadeIn delay={100} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+        <FadeIn delay={150} className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-bold text-slate-900">Live Session Trial Telemetry Ledger</h3>
-              <p className="text-xs text-slate-500 font-mono">
+              <h2 className="text-lg font-semibold tracking-tight text-slate-900">
+                Live Session Trial Telemetry Ledger
+              </h2>
+              <p className="text-xs text-slate-500 font-mono mt-0.5">
                 SERIAL: EXP-882-STRP • PARTICIPANT: SUB-09192 • ENGINE: WebGL 144Hz
               </p>
             </div>
-            <span className="text-xs font-mono text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 font-semibold">
-              REAL-TIME MONITORED
+            <span className="text-[11px] font-mono text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full font-medium">
+              Live Stream
             </span>
           </div>
 
@@ -405,25 +378,29 @@ audioContext.decodeAudioData(buffer); // Low-latency buffer`}
             <table className="w-full text-left text-xs font-mono border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 text-slate-500 uppercase text-[11px]">
-                  <th className="py-2.5 px-3">Trial ID</th>
-                  <th className="py-2.5 px-3">Stimulus Identifier</th>
-                  <th className="py-2.5 px-3">Fixation</th>
-                  <th className="py-2.5 px-3">Actual Onset</th>
-                  <th className="py-2.5 px-3">Measured Latency</th>
-                  <th className="py-2.5 px-3">Accuracy</th>
-                  <th className="py-2.5 px-3">Telemetry Stream</th>
+                  <th className="py-2 px-3 font-medium">Trial ID</th>
+                  <th className="py-2 px-3 font-medium">Stimulus Identifier</th>
+                  <th className="py-2 px-3 font-medium">Fixation</th>
+                  <th className="py-2 px-3 font-medium">Actual Onset</th>
+                  <th className="py-2 px-3 font-medium">Measured Latency</th>
+                  <th className="py-2 px-3 font-medium">Accuracy</th>
+                  <th className="py-2 px-3 font-medium">Stream</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {sampleTrials.map((t) => (
                   <tr key={t.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-2.5 px-3 font-bold text-slate-900">{t.id}</td>
-                    <td className="py-2.5 px-3 text-slate-700">{t.stim}</td>
-                    <td className="py-2.5 px-3 text-slate-600">{t.fix}</td>
-                    <td className="py-2.5 px-3 text-slate-600">{t.onset}</td>
-                    <td className="py-2.5 px-3 text-emerald-600 font-bold">{t.latency}</td>
-                    <td className="py-2.5 px-3 text-emerald-700 font-semibold">{t.acc}</td>
-                    <td className="py-2.5 px-3 text-slate-500">{t.stream}</td>
+                    <td className="py-2 px-3 font-semibold text-slate-900">{t.id}</td>
+                    <td className="py-2 px-3 text-slate-700">{t.stim}</td>
+                    <td className="py-2 px-3 text-slate-600">{t.fix}</td>
+                    <td className="py-2 px-3 text-slate-600">{t.onset}</td>
+                    <td className="py-2 px-3 text-emerald-700 font-bold">{t.latency}</td>
+                    <td className="py-2 px-3">
+                      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 rounded text-[10px] font-bold">
+                        {t.acc}
+                      </span>
+                    </td>
+                    <td className="py-2 px-3 text-slate-500">{t.stream}</td>
                   </tr>
                 ))}
               </tbody>
@@ -432,23 +409,23 @@ audioContext.decodeAudioData(buffer); // Low-latency buffer`}
         </FadeIn>
 
         {/* IRB & NIST Traceability Guarantee */}
-        <FadeIn delay={100} className="bg-emerald-900 text-white rounded-2xl p-6 shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
+        <FadeIn delay={150} className="bg-slate-900 text-white border border-slate-800 rounded-xl p-6 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-800 flex items-center justify-center text-white">
-              <span className="material-symbols-outlined text-[24px]">verified_user</span>
+            <div className="w-9 h-9 rounded-lg bg-emerald-600/20 text-emerald-400 flex items-center justify-center">
+              <span className="material-symbols-outlined text-[20px]">verified_user</span>
             </div>
             <div>
-              <h4 className="font-bold text-sm">IRB &amp; NIST Laboratory Traceability Guarantee</h4>
-              <p className="text-xs text-emerald-200 mt-0.5">
-                All sub-millisecond timestamps conform to IEEE 1588 Precision Time Protocol &amp; APA Open-Science empirical standards.
+              <h4 className="font-semibold text-sm text-white">IRB &amp; NIST Laboratory Traceability Guarantee</h4>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Sub-millisecond timestamps conform to IEEE 1588 Precision Time Protocol &amp; open-science empirical standards.
               </p>
             </div>
           </div>
           <Link
             to="/dashboard"
-            className="px-4 py-2 rounded-xl bg-white text-emerald-900 text-xs font-bold hover:bg-emerald-50 transition-colors whitespace-nowrap shadow-xs"
+            className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors whitespace-nowrap shadow-2xs"
           >
-            Launch Researcher Console
+            Researcher Console
           </Link>
         </FadeIn>
 
@@ -456,9 +433,9 @@ audioContext.decodeAudioData(buffer); // Low-latency buffer`}
 
       {/* Footer */}
       <footer className="border-t border-slate-200 bg-white py-6 text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
+        <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-2 font-mono">
           <div>© 2025 Manova Labs Inc. Precision Research Framework.</div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 text-[11px]">
             <span>SYNC LATENCY: 0.12MS UTC</span>
             <span>SOC2 TYPE II</span>
             <span>IRB / HIPAA COMPLIANT</span>

@@ -3,8 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import FadeIn from '../components/FadeIn';
 
+import { useAuth } from '../context/AuthContext';
+
 export default function AuthPage() {
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   // Primary toggle: 'researcher' | 'participant'
   const [portalMode, setPortalMode] = useState('researcher');
@@ -38,7 +41,9 @@ export default function AuthPage() {
     setIsLoading(true);
     try {
       const data = await api.auth.login(loginEmail, loginPassword);
-      if (data.token) localStorage.setItem('token', data.token);
+      if (data.token) {
+        login(data.token, data.researcher || { email: loginEmail, name: loginEmail.split('@')[0] });
+      }
       navigate('/dashboard');
     } catch (err) {
       alert(err.message || 'Login failed. Please check your credentials.');

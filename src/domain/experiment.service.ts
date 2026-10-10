@@ -36,7 +36,15 @@ export class ExperimentService {
     updatedAt: Date | string;
     trialCount?: number;
     _count?: { trials: number };
+    preset?: string;
+    config?: any;
   }) {
+    const rawConfig = exp.config;
+    const preset =
+      exp.preset ||
+      (rawConfig && typeof rawConfig === 'object' ? (rawConfig as any).preset : undefined) ||
+      'Visual Stroop';
+    const isoCreated = typeof exp.createdAt === 'string' ? exp.createdAt : exp.createdAt.toISOString();
     return {
       id: exp.id,
       title: exp.title,
@@ -44,8 +52,10 @@ export class ExperimentService {
       status: exp.status,
       version: exp.version,
       publicSlug: exp.publicSlug,
+      preset,
+      created_at: isoCreated,
+      createdAt: isoCreated,
       trialCount: exp.trialCount ?? exp._count?.trials ?? 0,
-      createdAt: typeof exp.createdAt === 'string' ? exp.createdAt : exp.createdAt.toISOString(),
       updatedAt: typeof exp.updatedAt === 'string' ? exp.updatedAt : exp.updatedAt.toISOString(),
     };
   }
@@ -189,8 +199,26 @@ export class ExperimentService {
       throw new UnauthorizedError('Authentication required');
     }
 
+    const researcher = await prisma.researcher.findFirst({
+      where: {
+        OR: [
+          { id: researcherId },
+          { email: researcherId },
+        ],
+      },
+      select: { id: true, email: true },
+    });
+
+    const targetId = researcher ? researcher.id : researcherId;
+    const targetEmail = researcher ? researcher.email : (researcherId.includes('@') ? researcherId : undefined);
+
     const experiments = await prisma.experiment.findMany({
-      where: { ownerResearcherId: researcherId },
+      where: {
+        OR: [
+          { ownerResearcherId: targetId },
+          ...(targetEmail ? [{ researcher: { email: targetEmail } }] : []),
+        ],
+      },
       orderBy: { createdAt: 'desc' },
       include: {
         _count: {
@@ -381,7 +409,7 @@ export class ExperimentService {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
         throw new ConflictError(
           'Resource conflict: one or more unique identifiers or constraints already exist',
-          'EXPERIMENT_ALREADY_PUBLISHED'
+          'INVALID_EXPERIMENT'
         );
       }
       throw err;

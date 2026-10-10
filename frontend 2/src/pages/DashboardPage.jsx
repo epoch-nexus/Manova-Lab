@@ -1,141 +1,34 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import FadeIn from '../components/FadeIn';
+import Header from '../components/Header';
+import { useAuth } from '../context/AuthContext';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
-  // State
-  const [devState, setDevState] = useState('populated'); // 'populated' | 'loading' | 'empty'
-  const [categoryFilter, setCategoryFilter] = useState('all'); // 'all' | 'published' | 'draft' | 'archived'
+  // Component State for live data
+  const [experiments, setExperiments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Filters and UI Controls
+  const [categoryFilter, setCategoryFilter] = useState('all'); // 'all' | 'published' | 'draft'
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('modified');
-  const [viewMode, setViewMode] = useState('grid'); // 'table' | 'grid'
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
   const [toastMessage, setToastMessage] = useState(null);
 
   // Modals state
   const [publishModal, setPublishModal] = useState({ open: false, experiment: null });
   const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [seedModalOpen, setSeedModalOpen] = useState(false);
+  const [newProtocolTitle, setNewProtocolTitle] = useState('');
+  const [selectedPreset, setSelectedPreset] = useState('Visual Stroop (Word/Color)');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createError, setCreateError] = useState(null);
   const [activeMenuId, setActiveMenuId] = useState(null);
-
-  // Initial Experiments list
-  const [experiments, setExperiments] = useState([
-    {
-      id: 'EXP-882-STRP',
-      version: 'v2.4',
-      isDraft: false,
-      title: 'Stroop Interference & Executive Inhibition Matrix',
-      paradigm: 'Visual Color-Word Stroop',
-      engine: 'High-frequency 144Hz WebGL',
-      status: 'published',
-      participants: 840,
-      quota: 1000,
-      pct: 84,
-      meanRt: '342.1 ms',
-      jitter: '±0.08 ms',
-      activity: 'Active 4 mins ago',
-      shareUrl: 'https://manova.app/run/MANOVA-7749-STROOP'
-    },
-    {
-      id: 'EXP-904-ERP',
-      version: 'v1.1',
-      isDraft: false,
-      title: 'Rapid Visual ERP & P300 Neural Synchronization',
-      paradigm: 'Event-Related Potential 64-Ch',
-      engine: 'LSL Synchronized Stream',
-      status: 'published',
-      participants: 428,
-      quota: 500,
-      pct: 85.6,
-      meanRt: '289.4 ms',
-      jitter: '±0.04 ms',
-      activity: 'Active 28 mins ago',
-      shareUrl: 'https://manova.app/run/MANOVA-904-ERP'
-    },
-    {
-      id: 'EXP-771-PUPIL',
-      version: 'v3.0',
-      isDraft: false,
-      title: 'Pupillometric Cognitive Load & Task Difficulty Staircase',
-      paradigm: 'Dual-Purkinje Eye Tracking',
-      engine: 'Pupil diameter 250Hz sampling',
-      status: 'published',
-      participants: 312,
-      quota: 350,
-      pct: 89.1,
-      meanRt: '412.0 ms',
-      jitter: '±0.12 ms',
-      activity: 'Active 2 hours ago',
-      shareUrl: 'https://manova.app/run/MANOVA-771-PUPIL'
-    },
-    {
-      id: 'EXP-915-NBK',
-      version: 'DRAFT',
-      isDraft: true,
-      title: 'Spatial N-Back Working Memory Protocol (Audio-Visual)',
-      paradigm: 'Multi-modal N-Back',
-      engine: '48 trials configured | Calibration pending',
-      status: 'draft',
-      participants: 0,
-      quota: 0,
-      pct: 0,
-      customParticipantText: '0 participants (Awaiting stimuli & IRB)',
-      meanRt: 'Uncalibrated',
-      jitter: '',
-      activity: 'Edited yesterday by Dr. Arun',
-      shareUrl: 'https://manova.app/run/MANOVA-915-NBK'
-    },
-    {
-      id: 'EXP-930-GNG',
-      version: 'DRAFT',
-      isDraft: true,
-      title: 'Continuous Performance Test (CPT) - Sustained Attention',
-      paradigm: 'Go/No-Go Paradigm',
-      engine: '120 trials configured | Validated',
-      status: 'draft',
-      participants: 0,
-      quota: 0,
-      pct: 0,
-      customParticipantText: '0 participants (Validated)',
-      meanRt: 'Simulated: 275ms',
-      jitter: '',
-      activity: 'Edited 3 days ago',
-      shareUrl: 'https://manova.app/run/MANOVA-930-GNG'
-    }
-  ]);
-
-  useEffect(() => {
-    const fetchExperiments = async () => {
-      try {
-        const res = await api.experiments.list();
-        const exps = res.data || res;
-        if (Array.isArray(exps)) {
-          const mapped = exps.map(exp => ({
-            id: exp.id,
-            version: 'v' + (exp.version || 1),
-            isDraft: exp.status === 'draft',
-            title: exp.title || 'Untitled',
-            paradigm: 'Behavioral',
-            engine: 'Standard Engine',
-            status: exp.status || 'draft',
-            participants: exp._count?.sessions || 0,
-            quota: 100,
-            pct: 0,
-            meanRt: '-',
-            activity: 'Active',
-            shareUrl: `http://localhost:3000/run/${exp.id}`
-          }));
-          setExperiments(mapped);
-          setDevState(mapped.length ? 'populated' : 'empty');
-        }
-      } catch (err) {
-        console.error('Failed to fetch experiments', err);
-      }
-    };
-    fetchExperiments();
-  }, []);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -147,53 +40,349 @@ export default function DashboardPage() {
     showToast('Participant link copied to clipboard!');
   };
 
-  const handlePublish = (exp) => {
-    setExperiments(prev => prev.map(item => {
-      if (item.id === exp.id) {
+  // Fetch experiments on mount and whenever user resolves with Authorization Bearer header
+  const fetchUserExperiments = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const query = user?.id || user?.email ? { user_id: user.id || user.email, email: user.email } : undefined;
+      const res = await api.experiments.list(query);
+      
+      // Response Parsing: handle res.data, res.data.experiments, res.experiments, or direct array
+      const rawList = Array.isArray(res)
+        ? res
+        : Array.isArray(res?.experiments)
+        ? res.experiments
+        : Array.isArray(res?.data?.experiments)
+        ? res.data.experiments
+        : Array.isArray(res?.data)
+        ? res.data
+        : [];
+
+      const mapped = rawList.map((exp) => {
+        const rawStatus = (exp.status || 'draft').toLowerCase();
+        const preset = exp.preset || exp.config?.preset || exp.paradigm || 'Visual Stroop';
+        const createdAt = exp.created_at || exp.createdAt || new Date().toISOString();
         return {
-          ...item,
-          status: 'published',
-          version: 'v1.0',
-          isDraft: false,
-          customParticipantText: undefined,
-          quota: 200,
-          pct: 0
+          id: exp.id,
+          publicSlug: exp.publicSlug,
+          version: 'v' + (exp.version || 1),
+          isDraft: rawStatus === 'draft',
+          title: exp.title || 'Untitled Protocol',
+          preset,
+          paradigm: preset,
+          description: exp.description || `Sub-millisecond ${preset} cognitive assay.`,
+          engine: 'High-frequency 144Hz WebGL',
+          status: rawStatus,
+          created_at: createdAt,
+          createdAt,
+          participants: exp.trialCount || exp._count?.trials || exp._count?.sessions || 0,
+          quota: 100,
+          pct: 0,
+          meanRt: '-',
+          jitter: '±0.08 ms',
+          activity: createdAt ? new Date(createdAt).toLocaleDateString() : 'Active',
+          shareUrl: `${window.location.origin}/run/${exp.publicSlug || exp.id}`,
         };
+      });
+      setExperiments(mapped);
+    } catch (err) {
+      console.error('Failed to fetch user experiments from REST API', err);
+      setError(err instanceof Error ? err.message : 'Failed to connect to backend service.');
+      setExperiments([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id, user?.email]);
+
+  useEffect(() => {
+    fetchUserExperiments();
+  }, [fetchUserExperiments]);
+
+  // Handle Create Experiment (POST /api/v1/experiments)
+  const handleCreateExperiment = async (overridePreset) => {
+    const activePreset = overridePreset || selectedPreset || 'Visual Stroop (Word/Color)';
+    const title = newProtocolTitle.trim();
+
+    if (!title) {
+      setCreateError('Please provide a protocol title before initializing.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setCreateError(null);
+
+    const experimentId = crypto.randomUUID();
+    const trialId = crypto.randomUUID();
+    const stimId = crypto.randomUUID();
+
+    const slug =
+      title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '')
+        .slice(0, 36) +
+      '-' +
+      Math.floor(100 + Math.random() * 900);
+
+    // Generate initial trial block starting with positive orderIndex: 1
+    const generateTrialsForPreset = () => {
+      if (activePreset.includes('Go / No-Go')) {
+        return [
+          {
+            id: trialId,
+            orderIndex: 1,
+            label: 'Trial 1 - Go Stimulus',
+            instructions: 'Press SPACE when you see GREEN "X". Do not press for other letters.',
+            fixation: { enabled: true, durationMs: 400, symbol: '+' },
+            stimulus: {
+              id: stimId,
+              type: 'text',
+              content: 'X',
+              styling: { color: '#10B981', fontSize: '64px' },
+            },
+            timingConfig: {
+              preStimulusDelayMs: 400,
+              stimulusDurationMs: 1000,
+              responseTimeoutMs: 1500,
+              allowEarlyResponse: false,
+              waitForResponse: true,
+            },
+            expectedResponse: {
+              type: 'keypress',
+              allowedKeys: ['Space'],
+              correctResponse: 'Space',
+              evaluationMode: 'exact_match',
+            },
+            nextTrialId: null,
+          },
+        ];
       }
-      return item;
-    }));
-    setPublishModal({ open: true, experiment: exp });
-    showToast(`Protocol ${exp.id} deployed & token armed`);
+
+      if (activePreset.includes('N-Back')) {
+        return [
+          {
+            id: trialId,
+            orderIndex: 1,
+            label: 'Trial 1 - Working Memory',
+            instructions: 'Press [M] if current letter matches the previous letter.',
+            fixation: { enabled: true, durationMs: 500, symbol: '+' },
+            stimulus: {
+              id: stimId,
+              type: 'text',
+              content: 'B',
+              styling: { color: '#3B82F6', fontSize: '64px' },
+            },
+            timingConfig: {
+              preStimulusDelayMs: 500,
+              stimulusDurationMs: 1200,
+              responseTimeoutMs: 2000,
+              allowEarlyResponse: false,
+              waitForResponse: true,
+            },
+            expectedResponse: {
+              type: 'keypress',
+              allowedKeys: ['KeyM'],
+              correctResponse: 'KeyM',
+              evaluationMode: 'exact_match',
+            },
+            nextTrialId: null,
+          },
+        ];
+      }
+
+      if (activePreset.includes('Blank Canvas')) {
+        return [
+          {
+            id: trialId,
+            orderIndex: 1,
+            label: 'Block 1 - Step 1',
+            instructions: 'Blank protocol canvas initial trial step.',
+            fixation: { enabled: true, durationMs: 500, symbol: '+' },
+            stimulus: {
+              id: stimId,
+              type: 'text',
+              content: 'START',
+              styling: { color: '#10B981', fontSize: '48px' },
+            },
+            timingConfig: {
+              preStimulusDelayMs: 500,
+              stimulusDurationMs: 1000,
+              responseTimeoutMs: 2000,
+              allowEarlyResponse: false,
+              waitForResponse: true,
+            },
+            expectedResponse: {
+              type: 'keypress',
+              allowedKeys: ['Space', 'KeyD'],
+              correctResponse: 'Space',
+              evaluationMode: 'exact_match',
+            },
+            nextTrialId: null,
+          },
+        ];
+      }
+
+      // Default: Visual Stroop
+      return [
+        {
+          id: trialId,
+          orderIndex: 1,
+          label: 'Trial 1 - Stroop Incongruent',
+          instructions: 'Identify ink color of target words using keys [D], [F], [J], [K]. Ignore semantic text meaning.',
+          fixation: { enabled: true, durationMs: 500, symbol: '+' },
+          stimulus: {
+            id: stimId,
+            type: 'text',
+            content: 'RED',
+            styling: { color: '#10B981', fontSize: '48px' },
+          },
+          timingConfig: {
+            preStimulusDelayMs: 500,
+            stimulusDurationMs: 1500,
+            responseTimeoutMs: 2500,
+            allowEarlyResponse: false,
+            waitForResponse: true,
+          },
+          expectedResponse: {
+            type: 'keypress',
+            allowedKeys: ['KeyD', 'KeyF', 'KeyJ', 'KeyK'],
+            correctResponse: 'KeyD',
+            evaluationMode: 'exact_match',
+          },
+          nextTrialId: null,
+        },
+      ];
+    };
+
+    try {
+      showToast('Initializing protocol on server...');
+      const created = await api.experiments.create({
+        id: experimentId,
+        title,
+        preset: activePreset,
+        status: 'DRAFT',
+        description: `Sub-millisecond ${activePreset} cognitive assay.`,
+        publicSlug: slug,
+        config: {
+          displayMode: 'fullscreen',
+          backgroundColor: '#0F172A',
+          allowPause: false,
+          showFeedback: true,
+          preset: activePreset,
+        },
+        trials: generateTrialsForPreset(),
+      });
+
+      const rawStatus = (created.status || 'draft').toLowerCase();
+      const preset = created.preset || activePreset;
+      const createdAt = created.created_at || created.createdAt || new Date().toISOString();
+      const newExp = {
+        id: created.id,
+        publicSlug: created.publicSlug,
+        version: 'v' + (created.version || 1),
+        isDraft: rawStatus === 'draft',
+        title: created.title,
+        preset,
+        paradigm: preset,
+        description: created.description,
+        engine: 'High-frequency 144Hz WebGL',
+        status: rawStatus,
+        created_at: createdAt,
+        createdAt,
+        participants: 0,
+        quota: 100,
+        pct: 0,
+        meanRt: '-',
+        jitter: '±0.08 ms',
+        activity: 'Just now',
+        shareUrl: `${window.location.origin}/run/${created.publicSlug || created.id}`,
+      };
+
+      // Immediately update local state array and re-invoke fetchUserExperiments
+      setExperiments((prev) => [newExp, ...prev.filter((e) => e.id !== newExp.id)]);
+      fetchUserExperiments();
+      setCreateModalOpen(false);
+      setNewProtocolTitle('');
+      setCreateError(null);
+      showToast(`Protocol created: ${created.title}`);
+
+      // Redirect user directly to the Protocol Builder for the new experiment
+      const targetId = created.id || experimentId;
+      navigate(`/builder/${targetId}`);
+    } catch (err) {
+      console.error('Create experiment failed', err);
+      const msg = err instanceof Error ? err.message : 'Server error occurred.';
+      setCreateError(msg);
+      showToast(`Create failed: ${msg}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
+  // Handle Publish Experiment (POST /api/v1/experiments/:id/publish)
+  const handlePublish = async (exp) => {
+    try {
+      showToast(`Publishing protocol ${exp.id}...`);
+      await api.experiments.publish(exp.id);
+      setExperiments((prev) =>
+        prev.map((item) =>
+          item.id === exp.id
+            ? { ...item, status: 'published', isDraft: false, version: 'v1.0' }
+            : item
+        )
+      );
+      setPublishModal({ open: true, experiment: { ...exp, status: 'published', isDraft: false } });
+      showToast(`Protocol ${exp.title} armed & published!`);
+    } catch (err) {
+      console.error('Publish API failed', err);
+      showToast(`Publish failed: ${err instanceof Error ? err.message : 'Error'}`);
+    }
+  };
+
+  // Handle Delete Experiment (DELETE /api/v1/experiments/:id)
+  const handleDeleteExperiment = async (id, title) => {
+    if (!window.confirm(`Delete protocol "${title || id}"? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      showToast('Deleting protocol...');
+      await api.experiments.delete(id, true);
+      setExperiments((prev) => prev.filter((e) => e.id !== id));
+      setActiveMenuId(null);
+      showToast('Protocol deleted from database.');
+    } catch (err) {
+      console.error('Delete failed', err);
+      showToast(`Delete failed: ${err instanceof Error ? err.message : 'Error'}`);
+    }
+  };
+
+  // Filtered & Sorted Experiments
   const filteredExperiments = useMemo(() => {
-    if (devState === 'empty') return [];
+    return experiments
+      .filter((exp) => {
+        if (categoryFilter === 'published' && exp.status !== 'published') return false;
+        if (categoryFilter === 'draft' && exp.status !== 'draft') return false;
 
-    return experiments.filter(exp => {
-      // Category filter
-      if (categoryFilter === 'published' && exp.status !== 'published') return false;
-      if (categoryFilter === 'draft' && exp.status !== 'draft') return false;
-      if (categoryFilter === 'archived') return false;
+        if (searchQuery.trim()) {
+          const query = searchQuery.toLowerCase();
+          const matchesTitle = exp.title.toLowerCase().includes(query);
+          const matchesId = exp.id.toLowerCase().includes(query);
+          const matchesParadigm = exp.paradigm.toLowerCase().includes(query);
+          if (!matchesTitle && !matchesId && !matchesParadigm) return false;
+        }
 
-      // Search filter
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase();
-        const matchesTitle = exp.title.toLowerCase().includes(query);
-        const matchesId = exp.id.toLowerCase().includes(query);
-        const matchesParadigm = exp.paradigm.toLowerCase().includes(query);
-        if (!matchesTitle && !matchesId && !matchesParadigm) return false;
-      }
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'participants') return b.participants - a.participants;
+        if (sortBy === 'title') return a.title.localeCompare(b.title);
+        return 0;
+      });
+  }, [experiments, categoryFilter, searchQuery, sortBy]);
 
-      return true;
-    }).sort((a, b) => {
-      if (sortBy === 'participants') return b.participants - a.participants;
-      if (sortBy === 'latency') return parseFloat(a.meanRt) - parseFloat(b.meanRt);
-      return 0; // default order
-    });
-  }, [experiments, devState, categoryFilter, searchQuery, sortBy]);
-
-  const publishedCount = experiments.filter(e => e.status === 'published').length;
-  const draftCount = experiments.filter(e => e.status === 'draft').length;
+  const publishedCount = experiments.filter((e) => e.status === 'published').length;
+  const draftCount = experiments.filter((e) => e.status === 'draft').length;
 
   return (
     <div className="min-h-screen bg-surface flex flex-col font-sans text-on-surface">
@@ -205,54 +394,11 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Top Header */}
-      <header className="sticky top-0 left-0 right-0 z-40 bg-surface-container-lowest/90 backdrop-blur-md shadow-[0_1px_8px_rgba(0,0,0,0.04)] border-b border-surface-container">
-        <div className="h-16 w-full px-4 sm:px-8 max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-8">
-            <Link to="/" className="flex items-center gap-2.5 group">
-              <div className="w-8 h-8 rounded-lg bg-primary-container flex items-center justify-center text-on-primary-container shadow-sm group-hover:scale-105 transition-transform">
-                <span className="material-symbols-outlined text-[19px]">biotech</span>
-              </div>
-              <div className="flex items-baseline tracking-tight font-bold text-lg">
-                <span className="text-on-surface">MANOVA</span>
-                <span className="text-primary-container ml-1">Labs</span>
-              </div>
-            </Link>
-
-            <div className="hidden xl:block h-5 w-[1px] bg-surface-container-highest"></div>
-
-            <nav className="hidden lg:flex items-center gap-1 text-xs font-semibold uppercase tracking-wider">
-              <Link to="/dashboard" className="px-3 py-1.5 bg-surface-container-high text-on-surface rounded">
-                My Experiments
-              </Link>
-            </nav>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-surface-container-low border border-surface-container rounded">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="font-mono text-xs text-on-surface uppercase tracking-wider">NODE #884-PX ONLINE</span>
-            </div>
-
-            <div className="hidden md:flex flex-col text-right">
-              <span className="font-mono text-xs text-on-surface font-semibold leading-none">dr.arun@stanford.edu</span>
-              <span className="font-mono text-[10px] text-emerald-600 tracking-wider uppercase font-semibold leading-none mt-1">PI PRIVILEGE</span>
-            </div>
-
-            <Link to="/auth" className="hidden sm:flex items-center gap-1 px-3 py-1 bg-surface-container-low hover:bg-surface-container-high font-mono text-xs text-on-surface rounded transition-colors uppercase tracking-wider">
-              <span className="material-symbols-outlined text-[16px]">logout</span> Log Out
-            </Link>
-
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-on-primary">
-              <span className="material-symbols-outlined text-[18px]">person</span>
-            </div>
-          </div>
-        </div>
-      </header>
+      {/* Live Authenticated User Header */}
+      <Header current="dashboard" />
 
       {/* Main Container */}
-      <main className="flex-1 w-full bg-surface pb-16">
-
+      <main className="flex-1 w-full bg-surface pb-16 pt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-8 pt-8 flex flex-col gap-8">
           {/* Page Title & Main Actions */}
           <FadeIn className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
@@ -268,7 +414,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-3 flex-wrap">
               <button
                 onClick={() => setCreateModalOpen(true)}
-                className="px-5 py-2.5 bg-primary hover:bg-emerald-700 text-on-primary text-xs font-mono uppercase tracking-wider font-bold shadow-md hover:shadow-lg shadow-emerald-700/20 flex items-center gap-2 rounded-lg transition-all"
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-mono uppercase tracking-wider font-bold shadow-md hover:shadow-lg shadow-emerald-700/20 flex items-center gap-2 rounded-lg transition-all cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[18px]">add</span>
                 <span>+ Create Experiment</span>
@@ -276,404 +422,350 @@ export default function DashboardPage() {
             </div>
           </FadeIn>
 
-          {/* Conditional Views: Loading, Empty, or Populated */}
-          {devState === 'loading' ? (
-            <FadeIn delay={100} className="w-full bg-surface-container-lowest rounded-xl border border-surface-container p-12 flex flex-col items-center justify-center text-center shadow-xs">
-              <span className="w-8 h-8 rounded-full border-3 border-emerald-500 border-t-transparent animate-spin mb-4"></span>
-              <h3 className="font-heading font-bold text-lg text-on-surface">Synchronizing Protocol Descriptors</h3>
-              <p className="font-mono text-xs text-on-surface-variant mt-1">Polling edge cache from Node #884-PX...</p>
-            </FadeIn>
-          ) : filteredExperiments.length === 0 ? (
-            <FadeIn delay={100} className="w-full bg-surface-container-lowest rounded-xl border border-surface-container p-12 flex flex-col items-center justify-center text-center shadow-xs">
-              <div className="w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 mb-4 border border-emerald-100">
-                <span className="material-symbols-outlined text-[32px]">science</span>
+          {/* Error Banner with Retry */}
+          {error && (
+            <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl flex items-center justify-between text-sm">
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-rose-600">error</span>
+                <span>{error}</span>
               </div>
-              <span className="font-mono text-xs uppercase tracking-widest text-primary font-bold mb-1">NO ACTIVE PROTOCOLS FOUND</span>
-              <h2 className="text-xl font-bold text-on-surface font-heading mb-2">No experiments created yet</h2>
-              <p className="text-sm text-on-surface-variant max-w-md mb-6 leading-relaxed">
-                Design your first sub-millisecond cognitive task or load a pre-configured template (Stroop, Go/No-Go, N-Back) with zero code. All experiments feature automated hardware clock synchronization.
+              <button
+                onClick={fetchExperiments}
+                className="px-3 py-1 bg-rose-600 text-white rounded font-mono text-xs uppercase hover:bg-rose-700 transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {/* Conditional Views: Loading Skeleton, Empty State, or Live Populated List */}
+          {loading ? (
+            /* Loading Skeleton / Spinner State */
+            <div className="w-full bg-surface-container-lowest rounded-xl border border-surface-container p-12 flex flex-col items-center justify-center text-center shadow-xs">
+              <span className="w-10 h-10 rounded-full border-3 border-emerald-500 border-t-transparent animate-spin mb-4"></span>
+              <h3 className="font-heading font-bold text-lg text-on-surface">Fetching User Protocols</h3>
+              <p className="text-xs font-mono text-on-surface-variant max-w-sm mt-1">
+                Authenticating session token &amp; loading experiment records from backend...
               </p>
-              <div className="flex flex-wrap items-center justify-center gap-3">
-                <button
-                  onClick={() => setCreateModalOpen(true)}
-                  className="px-5 py-2.5 bg-primary hover:bg-emerald-700 text-white font-mono text-xs uppercase tracking-wider font-semibold rounded-lg shadow-sm flex items-center gap-2"
-                >
-                  <span className="material-symbols-outlined text-[18px]">add</span>
-                  <span>+ Create Your First Experiment</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setDevState('populated');
-                    setCategoryFilter('all');
-                    showToast('Loaded Seeded Stroop Demo');
-                  }}
-                  className="px-5 py-2.5 bg-surface-container hover:bg-surface-container-high text-on-surface font-mono text-xs uppercase tracking-wider rounded-lg border border-surface-container transition-colors flex items-center gap-2"
-                >
-                  <span className="material-symbols-outlined text-[18px]">model_training</span>
-                  <span>Load Seeded Demo (Stroop Reaction Time)</span>
-                </button>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full mt-8 max-w-4xl">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-44 bg-surface-container-low rounded-xl animate-pulse"></div>
+                ))}
               </div>
+            </div>
+          ) : experiments.length === 0 ? (
+            /* Empty State UI */
+            <FadeIn delay={100} className="w-full bg-surface-container-lowest rounded-xl border border-surface-container p-12 flex flex-col items-center justify-center text-center shadow-xs">
+              <div className="w-16 h-16 rounded-2xl bg-surface-container-low flex items-center justify-center text-on-surface-variant mb-4">
+                <span className="material-symbols-outlined text-[36px]">science</span>
+              </div>
+              <h3 className="font-heading font-bold text-xl text-on-surface">No experiments found</h3>
+              <p className="text-sm text-on-surface-variant max-w-md mt-1 mb-6">
+                You have not created any cognitive protocols yet. Click '+ CREATE EXPERIMENT' to launch your first protocol.
+              </p>
+              <button
+                onClick={() => setCreateModalOpen(true)}
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-mono uppercase tracking-wider font-bold shadow-md rounded-lg flex items-center gap-2 transition-all cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">add</span>
+                <span>+ CREATE EXPERIMENT</span>
+              </button>
             </FadeIn>
-          ) : viewMode === 'table' ? (
-            /* Table View */
-            <FadeIn delay={100} className="w-full bg-surface-container-lowest rounded-xl border border-surface-container shadow-xs overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[980px]">
-                  <thead>
-                    <tr className="bg-surface-container-low font-mono text-xs text-on-surface-variant uppercase tracking-wider border-b border-surface-container">
-                      <th className="py-3 px-5 font-semibold">Experiment ID &amp; Title</th>
-                      <th className="py-3 px-5 font-semibold">Paradigm / Engine</th>
-                      <th className="py-3 px-5 font-semibold">Status</th>
-                      <th className="py-3 px-5 font-semibold">Participants / Quota</th>
-                      <th className="py-3 px-5 font-semibold">Mean RT &amp; Jitter</th>
-                      <th className="py-3 px-5 font-semibold">Telemetry Activity</th>
-                      <th className="py-3 px-5 text-right font-semibold">Direct Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-surface-container text-sm">
-                    {filteredExperiments.map(exp => (
-                      <tr key={exp.id} className="group hover:bg-surface-container-low/60 transition-colors">
-                        {/* Title & ID */}
-                        <td className="py-4 px-5">
-                          <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-xs text-emerald-700 font-bold uppercase tracking-wider">{exp.id}</span>
-                              <span className="px-1.5 py-0.5 bg-surface-container text-on-surface-variant font-mono text-[10px] rounded uppercase font-semibold">
+          ) : (
+            /* Live Populated View */
+            <div className="flex flex-col gap-6">
+              {/* Filter Tabs & Search Bar */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-surface-container">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={() => setCategoryFilter('all')}
+                    className={`px-3 py-1.5 text-xs font-mono uppercase tracking-wider rounded-lg transition-colors ${
+                      categoryFilter === 'all'
+                        ? 'bg-surface-container-high text-on-surface font-bold border border-surface-container'
+                        : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low'
+                    }`}
+                  >
+                    All Protocols ({experiments.length})
+                  </button>
+                  <button
+                    onClick={() => setCategoryFilter('published')}
+                    className={`px-3 py-1.5 text-xs font-mono uppercase tracking-wider rounded-lg transition-colors ${
+                      categoryFilter === 'published'
+                        ? 'bg-surface-container-high text-emerald-700 font-bold border border-surface-container'
+                        : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low'
+                    }`}
+                  >
+                    Published ({publishedCount})
+                  </button>
+                  <button
+                    onClick={() => setCategoryFilter('draft')}
+                    className={`px-3 py-1.5 text-xs font-mono uppercase tracking-wider rounded-lg transition-colors ${
+                      categoryFilter === 'draft'
+                        ? 'bg-surface-container-high text-amber-700 font-bold border border-surface-container'
+                        : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low'
+                    }`}
+                  >
+                    Drafts ({draftCount})
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">
+                      search
+                    </span>
+                    <input
+                      type="text"
+                      placeholder="Search title, ID, paradigm..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="bg-surface-container-low text-on-surface text-xs font-mono pl-9 pr-3 py-2 rounded-lg border border-surface-container focus:outline-none focus:ring-1 focus:ring-emerald-500 w-56 sm:w-64"
+                    />
+                  </div>
+
+                  <div className="flex items-center border border-surface-container rounded-lg p-0.5 bg-surface-container-low">
+                    <button
+                      onClick={() => setViewMode('grid')}
+                      className={`p-1.5 rounded transition-colors ${
+                        viewMode === 'grid' ? 'bg-white shadow-xs text-on-surface' : 'text-on-surface-variant'
+                      }`}
+                      title="Grid View"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">grid_view</span>
+                    </button>
+                    <button
+                      onClick={() => setViewMode('table')}
+                      className={`p-1.5 rounded transition-colors ${
+                        viewMode === 'table' ? 'bg-white shadow-xs text-on-surface' : 'text-on-surface-variant'
+                      }`}
+                      title="Table View"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">view_list</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Grid Cards View */}
+              {viewMode === 'grid' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredExperiments.map((exp) => (
+                    <FadeIn key={exp.id} className="h-full">
+                      <div className="bg-surface-container-lowest rounded-xl border border-surface-container p-6 flex flex-col justify-between h-full shadow-xs hover:shadow-md transition-shadow relative group">
+                        <div className="flex flex-col gap-3">
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono text-xs text-on-surface-variant uppercase font-semibold">
+                              {exp.id}
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`px-2 py-0.5 rounded font-mono text-[10px] uppercase font-bold ${
+                                  exp.status === 'published'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : 'bg-amber-100 text-amber-800'
+                                }`}
+                              >
+                                {exp.status}
+                              </span>
+                              <span className="font-mono text-[10px] text-on-surface-variant px-1.5 py-0.5 bg-surface-container-low rounded">
                                 {exp.version}
                               </span>
                             </div>
-                            <span className="font-heading font-semibold text-on-surface text-[15px] group-hover:text-emerald-600 transition-colors">
-                              {exp.title}
-                            </span>
                           </div>
-                        </td>
 
-                        {/* Paradigm */}
-                        <td className="py-4 px-5">
-                          <div className="flex flex-col">
-                            <span className="font-medium text-on-surface text-sm">{exp.paradigm}</span>
-                            <span className="text-xs text-on-surface-variant font-mono">{exp.engine}</span>
+                          <h3 className="font-heading font-bold text-lg text-on-surface group-hover:text-emerald-700 transition-colors">
+                            {exp.title}
+                          </h3>
+
+                          <p className="text-xs text-on-surface-variant line-clamp-2 leading-relaxed">
+                            {exp.description}
+                          </p>
+
+                          <div className="flex items-center gap-2 pt-2 border-t border-surface-container text-xs font-mono text-on-surface-variant">
+                            <span className="material-symbols-outlined text-[16px] text-emerald-600">group</span>
+                            <span>{exp.participants} sessions recorded</span>
                           </div>
-                        </td>
+                        </div>
 
-                        {/* Status */}
-                        <td className="py-4 px-5">
-                          {exp.status === 'published' ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono text-[11px] uppercase font-bold">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                              <span>Published</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-mono text-[11px] uppercase font-bold">
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                              <span>Draft</span>
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Participants */}
-                        <td className="py-4 px-5">
-                          {exp.customParticipantText ? (
-                            <span className="text-xs text-on-surface-variant italic font-sans">{exp.customParticipantText}</span>
-                          ) : (
-                            <div className="flex flex-col gap-1.5 w-40">
-                              <div className="flex items-baseline justify-between font-mono text-xs">
-                                <span className="font-bold text-on-surface">{exp.participants} / {exp.quota}</span>
-                                <span className="text-emerald-700 font-bold">{exp.pct}%</span>
-                              </div>
-                              <div className="w-full bg-surface-container h-1.5 rounded-full overflow-hidden">
-                                <div className="bg-emerald-600 h-full rounded-full" style={{ width: `${exp.pct}%` }}></div>
-                              </div>
-                            </div>
-                          )}
-                        </td>
-
-                        {/* Mean RT & Jitter */}
-                        <td className="py-4 px-5 font-mono text-xs">
-                          <div className="flex flex-col">
-                            <span className="font-bold text-on-surface text-sm">{exp.meanRt}</span>
-                            {exp.jitter && <span className="text-on-surface-variant text-[11px]">Jitter: {exp.jitter}</span>}
-                          </div>
-                        </td>
-
-                        {/* Telemetry Activity */}
-                        <td className="py-4 px-5">
-                          <div className="flex items-center gap-1.5 text-xs text-on-surface-variant">
-                            <span className={`w-1.5 h-1.5 rounded-full ${exp.status === 'published' ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
-                            <span>{exp.activity}</span>
-                          </div>
-                        </td>
-
-                        {/* Direct Actions */}
-                        <td className="py-4 px-5 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
+                        {/* Card Action Buttons (Dynamic IDs) */}
+                        <div className="flex items-center justify-between pt-4 mt-4 border-t border-surface-container">
+                          <span className="font-mono text-[11px] text-on-surface-variant">{exp.activity}</span>
+                          <div className="flex items-center gap-2">
                             <button
-                              onClick={() => navigate('/builder')}
-                              className="px-2.5 py-1 bg-surface-container hover:bg-surface-container-high font-mono text-xs uppercase tracking-wider text-on-surface rounded border border-surface-container transition-colors"
-                              title="Edit Protocol"
+                              onClick={() => navigate(`/builder/${exp.id}`)}
+                              className="px-2.5 py-1 bg-surface-container hover:bg-surface-container-high text-xs font-mono uppercase tracking-wider rounded transition-colors"
+                              title="Edit Protocol Definition"
                             >
                               Edit
                             </button>
 
                             {exp.status === 'published' ? (
-                              <>
+                              <button
+                                onClick={() => navigate(`/results/${exp.id}`)}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-mono uppercase tracking-wider font-bold rounded transition-colors"
+                              >
+                                Results
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handlePublish(exp)}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-mono uppercase tracking-wider font-bold rounded transition-colors flex items-center gap-1"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">rocket_launch</span>
+                                <span>Publish</span>
+                              </button>
+                            )}
+
+                            <button
+                              onClick={() => navigate(`/run/${exp.publicSlug || exp.id}`)}
+                              className="px-2.5 py-1 bg-surface-container-high hover:bg-surface-container-highest text-xs font-mono uppercase tracking-wider text-emerald-700 font-bold rounded transition-colors"
+                              title="Execute in Test Runner"
+                            >
+                              Test
+                            </button>
+
+                            <button
+                              onClick={() => handleDeleteExperiment(exp.id, exp.title)}
+                              className="p-1 hover:bg-rose-50 text-on-surface-variant hover:text-rose-600 rounded transition-colors"
+                              title="Delete Protocol"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">delete</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </FadeIn>
+                  ))}
+                </div>
+              ) : (
+                /* Table View */
+                <div className="w-full bg-surface-container-lowest rounded-xl border border-surface-container overflow-x-auto shadow-xs">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-surface-container bg-surface-container-low font-mono text-[11px] uppercase tracking-wider text-on-surface-variant">
+                        <th className="py-3 px-4">Protocol ID</th>
+                        <th className="py-3 px-4">Title</th>
+                        <th className="py-3 px-4">Status</th>
+                        <th className="py-3 px-4">Sessions</th>
+                        <th className="py-3 px-4">Last Activity</th>
+                        <th className="py-3 px-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-surface-container font-mono text-xs">
+                      {filteredExperiments.map((exp) => (
+                        <tr key={exp.id} className="hover:bg-surface-container-low/50 transition-colors">
+                          <td className="py-3 px-4 font-semibold text-on-surface">{exp.id}</td>
+                          <td className="py-3 px-4 font-sans font-medium text-on-surface max-w-xs truncate">
+                            {exp.title}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span
+                              className={`px-2 py-0.5 rounded font-mono text-[10px] uppercase font-bold ${
+                                exp.status === 'published'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-amber-100 text-amber-800'
+                              }`}
+                            >
+                              {exp.status}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-on-surface-variant">{exp.participants}</td>
+                          <td className="py-3 px-4 text-on-surface-variant">{exp.activity}</td>
+                          <td className="py-3 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => navigate(`/builder/${exp.id}`)}
+                                className="px-2 py-1 bg-surface-container hover:bg-surface-container-high rounded"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => navigate(`/run/${exp.publicSlug || exp.id}`)}
+                                className="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold rounded"
+                              >
+                                Test
+                              </button>
+                              {exp.status === 'published' ? (
                                 <button
-                                  onClick={() => navigate('/results')}
-                                  className="px-2.5 py-1 bg-surface-container-high hover:bg-surface-container-highest font-mono text-xs uppercase tracking-wider text-emerald-700 font-bold rounded border border-surface-container transition-colors"
-                                  title="View Results"
+                                  onClick={() => navigate(`/results/${exp.id}`)}
+                                  className="px-2 py-1 bg-emerald-600 text-white rounded font-bold"
                                 >
                                   Results
                                 </button>
-                                <button
-                                  onClick={() => handleCopy(exp.shareUrl)}
-                                  className="p-1 hover:bg-surface-container text-on-surface-variant hover:text-on-surface rounded transition-colors"
-                                  title="Copy Runner Share Link"
-                                >
-                                  <span className="material-symbols-outlined text-[18px]">share</span>
-                                </button>
-                              </>
-                            ) : (
-                              <>
+                              ) : (
                                 <button
                                   onClick={() => handlePublish(exp)}
-                                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-mono text-xs uppercase tracking-wider font-bold rounded shadow-xs flex items-center gap-1 transition-all"
-                                  title="Publish Protocol"
+                                  className="px-2 py-1 bg-emerald-600 text-white rounded font-bold"
                                 >
-                                  <span className="material-symbols-outlined text-[14px]">rocket_launch</span>
-                                  <span>Publish</span>
+                                  Publish
                                 </button>
-                                <button
-                                  onClick={() => navigate('/runner')}
-                                  className="px-2 py-1 bg-surface-container hover:bg-surface-container-high font-mono text-xs uppercase tracking-wider text-on-surface rounded transition-colors"
-                                  title="Launch in Runner Sandbox"
-                                >
-                                  Runner
-                                </button>
-                              </>
-                            )}
-
-                            <div className="relative">
-                              <button
-                                onClick={() => setActiveMenuId(activeMenuId === exp.id ? null : exp.id)}
-                                className="p-1 hover:bg-surface-container text-on-surface-variant hover:text-on-surface rounded transition-colors"
-                              >
-                                <span className="material-symbols-outlined text-[18px]">more_vert</span>
-                              </button>
-                              {activeMenuId === exp.id && (
-                                <div className="absolute right-0 top-8 z-30 w-44 bg-surface-container-lowest rounded-lg border border-surface-container shadow-xl py-1 text-left font-mono text-xs">
-                                  <button
-                                    onClick={() => {
-                                      setActiveMenuId(null);
-                                      navigate('/builder');
-                                    }}
-                                    className="w-full px-3 py-1.5 hover:bg-surface-container flex items-center gap-2 text-on-surface"
-                                  >
-                                    <span className="material-symbols-outlined text-[16px]">edit</span>
-                                    <span>Open Visual Builder</span>
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setActiveMenuId(null);
-                                      navigate('/runner');
-                                    }}
-                                    className="w-full px-3 py-1.5 hover:bg-surface-container flex items-center gap-2 text-on-surface"
-                                  >
-                                    <span className="material-symbols-outlined text-[16px]">play_arrow</span>
-                                    <span>Run Test Session</span>
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setActiveMenuId(null);
-                                      showToast(`Exported ${exp.id} spec JSON`);
-                                    }}
-                                    className="w-full px-3 py-1.5 hover:bg-surface-container flex items-center gap-2 text-on-surface"
-                                  >
-                                    <span className="material-symbols-outlined text-[16px]">download</span>
-                                    <span>Export JSON Spec</span>
-                                  </button>
-                                </div>
                               )}
+                              <button
+                                onClick={() => handleDeleteExperiment(exp.id, exp.title)}
+                                className="p-1 hover:text-rose-600 text-on-surface-variant rounded"
+                              >
+                                <span className="material-symbols-outlined text-[16px]">delete</span>
+                              </button>
                             </div>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Pagination footer */}
-              <div className="px-5 py-3 bg-surface-container-low border-t border-surface-container flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono text-on-surface-variant">
-                <div>
-                  Displaying {filteredExperiments.length} of {experiments.length} active/draft protocols | Storage utilized: 1.24 GB / 50 GB
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-                <div className="flex items-center gap-1">
-                  <button className="px-2.5 py-1 bg-surface-container-lowest border border-surface-container rounded hover:bg-surface-container transition-colors disabled:opacity-40" disabled>
-                    PREVIOUS
-                  </button>
-                  <button className="px-2.5 py-1 bg-primary text-white font-bold rounded">1</button>
-                  <button className="px-2.5 py-1 bg-surface-container-lowest border border-surface-container rounded hover:bg-surface-container transition-colors">2</button>
-                  <button className="px-2.5 py-1 bg-surface-container-lowest border border-surface-container rounded hover:bg-surface-container transition-colors">
-                    NEXT
-                  </button>
-                </div>
-              </div>
-            </FadeIn>
-          ) : (
-            /* Grid View */
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {filteredExperiments.map((exp, idx) => (
-                <FadeIn key={exp.id} delay={((idx % 3) + 1) * 100} className="h-full">
-                  <div className="bg-surface-container-lowest p-6 rounded-xl border border-surface-container shadow-xs hover:border-emerald-300 transition-all flex flex-col justify-between h-full">
-                    <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs text-emerald-700 font-bold uppercase tracking-wider">{exp.id}</span>
-                          <span className="px-1.5 py-0.5 bg-surface-container text-on-surface-variant font-mono text-[10px] rounded uppercase font-semibold">
-                            {exp.version}
-                          </span>
-                        </div>
-                        {exp.status === 'published' ? (
-                          <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono text-[10px] uppercase font-bold">
-                            Published
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-mono text-[10px] uppercase font-bold">
-                            Draft
-                          </span>
-                        )}
-                      </div>
-                      <h3 className="font-heading font-bold text-on-surface text-base mb-1">{exp.title}</h3>
-                      <p className="text-xs text-on-surface-variant font-mono mb-4">{exp.paradigm} • {exp.engine}</p>
-
-                      <div className="bg-surface-container-low p-3 rounded-lg mb-4 text-xs font-mono">
-                        <div className="flex justify-between mb-1">
-                          <span className="text-on-surface-variant">Mean RT:</span>
-                          <span className="font-bold text-on-surface">{exp.meanRt}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-on-surface-variant">Participants:</span>
-                          <span className="font-bold text-on-surface">{exp.participants} / {exp.quota || '—'}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-3 border-t border-surface-container text-xs font-mono">
-                      <span className="text-on-surface-variant text-[11px]">{exp.activity}</span>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => navigate('/builder')}
-                          className="px-2.5 py-1 bg-surface-container hover:bg-surface-container-high rounded"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => navigate(exp.status === 'published' ? '/results' : '/runner')}
-                          className="px-2.5 py-1 bg-primary text-white font-bold rounded"
-                        >
-                          {exp.status === 'published' ? 'Results' : 'Test'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </FadeIn>
-              ))}
+              )}
             </div>
           )}
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="w-full bg-surface-container-low border-t border-surface-container">
-        <div className="max-w-7xl mx-auto px-4 sm:px-8 py-4 flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-mono text-on-surface-variant">
-          <div className="flex items-center gap-4 flex-wrap">
-            <span className="px-2 py-0.5 bg-surface-container-lowest text-on-surface uppercase tracking-wider font-semibold rounded border border-surface-container">
-              Manova Labs
-            </span>
-          </div>
-
-          <div className="flex items-center gap-6 flex-wrap">
-            <span>© 2025 Manova Labs Inc.</span>
-            <div className="flex items-center gap-4">
-              <Link to="/science" className="hover:text-emerald-600 transition-colors uppercase tracking-wider">
-                STATUS
-              </Link>
-              <Link to="/results" className="hover:text-emerald-600 transition-colors uppercase tracking-wider">
-                GOVERNANCE
-              </Link>
-              <Link to="/science" className="hover:text-emerald-600 transition-colors uppercase tracking-wider">
-                DOCS
-              </Link>
-            </div>
-          </div>
-        </div>
-      </footer>
-
-      {/* Modal: Publish / Dispatch Armed */}
+      {/* Modal: Publish Protocol */}
       {publishModal.open && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div className="bg-surface-container-lowest max-w-lg w-full p-6 rounded-2xl shadow-2xl border border-surface-container relative animate-in zoom-in-95 duration-150">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-sm">
-                  <span className="material-symbols-outlined text-[22px]">rocket_launch</span>
-                </div>
-                <div>
-                  <h3 className="font-heading font-bold text-lg text-on-surface">Experiment Ready for Deployment</h3>
-                  <span className="font-mono text-xs text-emerald-600 uppercase tracking-wider font-bold">TOKEN GENERATED • NODE SYNCHRONIZED</span>
-                </div>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                <span className="material-symbols-outlined text-[22px]">rocket_launch</span>
               </div>
+              <div>
+                <h3 className="font-heading font-bold text-lg text-on-surface">Protocol Published</h3>
+                <span className="font-mono text-xs text-emerald-600 uppercase tracking-wider font-semibold">
+                  ARMED FOR DIRECT PARTICIPANT RUNS
+                </span>
+              </div>
+            </div>
+
+            <p className="text-sm text-on-surface-variant mb-4">
+              Protocol <span className="font-bold text-on-surface">{publishModal.experiment?.title}</span> is now active. Share this link with participants:
+            </p>
+
+            <div className="flex items-center gap-2 mb-6">
+              <input
+                type="text"
+                readOnly
+                value={publishModal.experiment?.shareUrl}
+                className="flex-1 bg-surface-container-low px-3 py-2 text-xs font-mono rounded-lg border border-surface-container text-on-surface"
+              />
               <button
-                onClick={() => setPublishModal({ open: false, experiment: null })}
-                className="p-1 hover:bg-surface-container text-on-surface-variant rounded-lg"
+                onClick={() => handleCopy(publishModal.experiment?.shareUrl)}
+                className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-mono uppercase font-bold rounded-lg transition-colors"
               >
-                <span className="material-symbols-outlined text-[20px]">close</span>
+                Copy
               </button>
             </div>
 
-            <p className="text-sm text-on-surface-variant mb-4 leading-relaxed">
-              Experiment <span className="font-bold text-on-surface">{publishModal.experiment?.title}</span> is now armed. Direct participant telemetry streams will record to Stanford Vault #492.
-            </p>
-
-            <div className="bg-surface-container-low p-4 rounded-xl border border-surface-container mb-4">
-              <span className="font-mono text-xs text-on-surface-variant uppercase tracking-wider block mb-1.5 font-semibold">
-                PARTICIPANT DISPATCH LINK:
-              </span>
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  value={publishModal.experiment?.shareUrl || 'https://manova.app/run/MANOVA-7749-STROOP'}
-                  className="bg-surface-container-lowest px-3 py-2 rounded-lg font-mono text-xs text-on-surface w-full border border-surface-container focus:outline-none select-all"
-                />
-                <button
-                  onClick={() => handleCopy(publishModal.experiment?.shareUrl || 'https://manova.app/run/MANOVA-7749-STROOP')}
-                  className="px-4 py-2 bg-primary hover:bg-emerald-700 text-white font-mono text-xs uppercase font-bold rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap"
-                >
-                  <span className="material-symbols-outlined text-[16px]">content_copy</span> Copy
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mb-6 text-xs font-mono bg-surface-container-low p-3.5 rounded-xl border border-surface-container">
-              <div><span className="text-on-surface-variant">Sampling Rate:</span> <span className="font-bold text-on-surface">1,000 Hz</span></div>
-              <div><span className="text-on-surface-variant">Stimulus Accuracy:</span> <span className="font-bold text-on-surface">Sub-millisecond</span></div>
-              <div><span className="text-on-surface-variant">IRB Clearance:</span> <span className="font-bold text-emerald-600">#APPROVED</span></div>
-              <div><span className="text-on-surface-variant">Target Quota:</span> <span className="font-bold text-on-surface">Unlimited</span></div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2.5">
+            <div className="flex items-center justify-end gap-2">
               <button
                 onClick={() => setPublishModal({ open: false, experiment: null })}
-                className="px-4 py-2 bg-surface-container hover:bg-surface-container-high text-on-surface font-mono text-xs uppercase tracking-wider rounded-lg"
+                className="px-4 py-2 bg-surface-container hover:bg-surface-container-high text-xs font-mono uppercase rounded-lg"
               >
                 Close
               </button>
               <button
-                onClick={() => navigate('/runner')}
-                className="px-4 py-2 bg-primary text-white hover:bg-emerald-700 font-mono text-xs uppercase tracking-wider font-bold rounded-lg transition-colors flex items-center gap-1.5"
+                onClick={() => navigate(`/run/${publishModal.experiment?.publicSlug || publishModal.experiment?.id}`)}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-mono uppercase font-bold rounded-lg"
               >
-                <span className="material-symbols-outlined text-[16px]">open_in_new</span> Test in Runner
+                Test in Runner
               </button>
             </div>
           </div>
@@ -686,12 +778,14 @@ export default function DashboardPage() {
           <div className="bg-surface-container-lowest max-w-xl w-full p-6 rounded-2xl shadow-2xl border border-surface-container relative animate-in zoom-in-95 duration-150">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white shadow-sm">
+                <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-sm">
                   <span className="material-symbols-outlined text-[22px]">science</span>
                 </div>
                 <div>
                   <h3 className="font-heading font-bold text-lg text-on-surface">Create Cognitive Protocol</h3>
-                  <span className="font-mono text-xs text-primary uppercase tracking-wider font-semibold">SELECT TEMPLATE OR COMPOSE SCRATCH</span>
+                  <span className="font-mono text-xs text-emerald-600 uppercase tracking-wider font-semibold">
+                    POST /API/V1/EXPERIMENTS
+                  </span>
                 </div>
               </div>
               <button
@@ -705,12 +799,17 @@ export default function DashboardPage() {
             <div className="flex flex-col gap-4">
               <div>
                 <label className="font-mono text-xs text-on-surface uppercase tracking-wider block mb-1.5 font-semibold">
-                  Experiment Protocol Title
+                  Protocol Title <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
+                  value={newProtocolTitle}
+                  onChange={(e) => {
+                    setNewProtocolTitle(e.target.value);
+                    if (createError) setCreateError(null);
+                  }}
                   placeholder="e.g. Attentional Blink & Temporal Dynamics Assays"
-                  className="w-full bg-surface-container-low px-4 py-2.5 rounded-lg text-on-surface text-sm border border-surface-container focus:bg-surface-container-lowest focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full bg-surface-container-low px-4 py-2.5 rounded-lg text-on-surface text-sm border border-surface-container focus:bg-surface-container-lowest focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
 
@@ -721,137 +820,100 @@ export default function DashboardPage() {
                 <div className="grid grid-cols-2 gap-2.5">
                   <button
                     type="button"
-                    onClick={() => {
-                      setCreateModalOpen(false);
-                      navigate('/builder');
-                    }}
-                    className="p-3 text-left bg-surface-container-high hover:bg-surface-container-highest border border-surface-container rounded-lg transition-colors group"
+                    onClick={() => setSelectedPreset('Visual Stroop (Word/Color)')}
+                    className={`p-3 text-left border rounded-lg transition-all group cursor-pointer ${
+                      selectedPreset === 'Visual Stroop (Word/Color)'
+                        ? 'bg-emerald-50/70 border-emerald-500 ring-2 ring-emerald-500/30'
+                        : 'bg-surface-container-low hover:bg-surface-container border-surface-container'
+                    }`}
                   >
-                    <span className="font-heading text-xs text-on-surface block font-bold group-hover:text-primary">Visual Stroop (Word/Color)</span>
-                    <span className="text-[11px] text-on-surface-variant font-mono">Inhibition &amp; Interference</span>
+                    <span className="font-heading text-xs text-on-surface block font-bold group-hover:text-emerald-700">
+                      Visual Stroop
+                    </span>
+                    <span className="text-[11px] text-on-surface-variant font-mono">Word &amp; ink color interference</span>
                   </button>
+
                   <button
                     type="button"
-                    onClick={() => {
-                      setCreateModalOpen(false);
-                      navigate('/builder');
-                    }}
-                    className="p-3 text-left bg-surface-container-low hover:bg-surface-container-high border border-surface-container rounded-lg transition-colors group"
+                    onClick={() => setSelectedPreset('Go / No-Go Sustained Attention')}
+                    className={`p-3 text-left border rounded-lg transition-all group cursor-pointer ${
+                      selectedPreset === 'Go / No-Go Sustained Attention'
+                        ? 'bg-emerald-50/70 border-emerald-500 ring-2 ring-emerald-500/30'
+                        : 'bg-surface-container-low hover:bg-surface-container border-surface-container'
+                    }`}
                   >
-                    <span className="font-heading text-xs text-on-surface block font-bold group-hover:text-primary">Go / No-Go Sustained</span>
+                    <span className="font-heading text-xs text-on-surface block font-bold group-hover:text-emerald-700">
+                      Go / No-Go
+                    </span>
                     <span className="text-[11px] text-on-surface-variant font-mono">Impulse control &amp; vigilance</span>
                   </button>
+
                   <button
                     type="button"
-                    onClick={() => {
-                      setCreateModalOpen(false);
-                      navigate('/builder');
-                    }}
-                    className="p-3 text-left bg-surface-container-low hover:bg-surface-container-high border border-surface-container rounded-lg transition-colors group"
+                    onClick={() => setSelectedPreset('N-Back Working Memory Protocol')}
+                    className={`p-3 text-left border rounded-lg transition-all group cursor-pointer ${
+                      selectedPreset === 'N-Back Working Memory Protocol'
+                        ? 'bg-emerald-50/70 border-emerald-500 ring-2 ring-emerald-500/30'
+                        : 'bg-surface-container-low hover:bg-surface-container border-surface-container'
+                    }`}
                   >
-                    <span className="font-heading text-xs text-on-surface block font-bold group-hover:text-primary">N-Back Working Memory</span>
-                    <span className="text-[11px] text-on-surface-variant font-mono">Multi-modal load staircase</span>
+                    <span className="font-heading text-xs text-on-surface block font-bold group-hover:text-emerald-700">
+                      N-Back
+                    </span>
+                    <span className="text-[11px] text-on-surface-variant font-mono">Multi-modal working memory</span>
                   </button>
+
                   <button
                     type="button"
-                    onClick={() => {
-                      setCreateModalOpen(false);
-                      navigate('/builder');
-                    }}
-                    className="p-3 text-left bg-surface-container-low hover:bg-surface-container-high border border-surface-container rounded-lg transition-colors group"
+                    onClick={() => setSelectedPreset('Blank Canvas Protocol')}
+                    className={`p-3 text-left border rounded-lg transition-all group cursor-pointer ${
+                      selectedPreset === 'Blank Canvas Protocol'
+                        ? 'bg-emerald-50/70 border-emerald-500 ring-2 ring-emerald-500/30'
+                        : 'bg-surface-container-low hover:bg-surface-container border-surface-container'
+                    }`}
                   >
-                    <span className="font-heading text-xs text-on-surface block font-bold group-hover:text-primary">Blank Canvas (DSL)</span>
-                    <span className="text-[11px] text-on-surface-variant font-mono">Raw JSON state machine</span>
+                    <span className="font-heading text-xs text-on-surface block font-bold group-hover:text-emerald-700">
+                      Blank Canvas
+                    </span>
+                    <span className="text-[11px] text-on-surface-variant font-mono">Empty custom state machine</span>
                   </button>
                 </div>
               </div>
 
+              {/* Inline Error Message */}
+              {createError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-xs font-mono flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[16px] text-rose-600">error</span>
+                  <span>{createError}</span>
+                </div>
+              )}
+
               <div className="flex items-center justify-between pt-3 border-t border-surface-container text-xs font-mono">
-                <span className="text-on-surface-variant">Auto-allocates node cluster latency test</span>
+                <span className="text-on-surface-variant">Allocates schema on server</span>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setCreateModalOpen(false)}
-                    className="px-4 py-2 bg-surface-container text-on-surface uppercase rounded-lg hover:bg-surface-container-high"
+                    disabled={isSubmitting}
+                    onClick={() => {
+                      setCreateModalOpen(false);
+                      setCreateError(null);
+                    }}
+                    className="px-4 py-2 bg-surface-container text-on-surface uppercase rounded-lg hover:bg-surface-container-high cursor-pointer disabled:opacity-50"
                   >
                     Cancel
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setCreateModalOpen(false);
-                      navigate('/builder');
-                    }}
-                    className="px-4 py-2 bg-primary hover:bg-emerald-700 text-white uppercase font-bold rounded-lg transition-colors"
+                    disabled={!newProtocolTitle.trim() || isSubmitting}
+                    onClick={() => handleCreateExperiment()}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white uppercase font-bold rounded-lg transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                   >
-                    Initialize Protocol
+                    {isSubmitting && (
+                      <span className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin"></span>
+                    )}
+                    <span>{isSubmitting ? 'INITIALIZING...' : 'INITIALIZE PROTOCOL'}</span>
                   </button>
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Import Protocol JSON */}
-      {seedModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-surface-container-lowest max-w-xl w-full p-6 rounded-2xl shadow-2xl border border-surface-container relative animate-in zoom-in-95 duration-150">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-surface-container-high flex items-center justify-center text-primary shadow-sm">
-                  <span className="material-symbols-outlined text-[22px]">code</span>
-                </div>
-                <div>
-                  <h3 className="font-heading font-bold text-lg text-on-surface">Import Protocol Specification</h3>
-                  <span className="font-mono text-xs text-on-surface-variant uppercase tracking-wider font-semibold">PASTE JSON OR DROP FILE</span>
-                </div>
-              </div>
-              <button
-                onClick={() => setSeedModalOpen(false)}
-                className="p-1 hover:bg-surface-container text-on-surface-variant rounded-lg"
-              >
-                <span className="material-symbols-outlined text-[20px]">close</span>
-              </button>
-            </div>
-
-            <div className="flex flex-col gap-4">
-              <div className="bg-surface-container-low p-3 rounded-xl border border-surface-container font-mono text-xs text-on-surface-variant">
-                Supports schema v3.2 Manova Protocol JSON (trials, stimuli, timings, branching logic, and randomization seeds).
-              </div>
-
-              <textarea
-                rows={8}
-                defaultValue={`{
-  "name": "Rapid Visual ERP & P300 Neural Synchronization",
-  "trials": 64,
-  "sampling": "1000Hz",
-  "randomization": "seeded",
-  "seed": 49204,
-  "branching": true
-}`}
-                className="w-full bg-slate-950 text-emerald-400 p-4 rounded-xl font-mono text-xs border border-slate-800 focus:outline-none focus:border-emerald-500"
-              />
-
-              <div className="flex items-center justify-end gap-2.5 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setSeedModalOpen(false)}
-                  className="px-4 py-2 bg-surface-container text-on-surface font-mono text-xs uppercase rounded-lg hover:bg-surface-container-high"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSeedModalOpen(false);
-                    showToast('Imported Protocol JSON successfully!');
-                    navigate('/builder');
-                  }}
-                  className="px-4 py-2 bg-primary hover:bg-emerald-700 text-white font-mono text-xs uppercase font-bold rounded-lg shadow-sm transition-colors"
-                >
-                  Validate &amp; Open in Builder
-                </button>
               </div>
             </div>
           </div>

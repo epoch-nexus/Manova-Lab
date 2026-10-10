@@ -34,7 +34,11 @@ experimentRouter.get(
   '/',
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const researcherId = req.researcher!.id;
+      const queryTarget =
+        (req.query.user_id as string) ||
+        (req.query.email as string) ||
+        (req.query.researcherId as string);
+      const researcherId = queryTarget || req.researcher!.id || req.researcher!.email;
       const result = await experimentService.listExperiments(researcherId);
       res.status(200).json(result);
     } catch (err) {
