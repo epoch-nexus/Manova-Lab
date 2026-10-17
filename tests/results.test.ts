@@ -418,6 +418,26 @@ describe('Phase 5 Results Aggregation, Analytics & Data Export', () => {
   });
 
   // ========================================================
+  // 7b. Parquet-Compatible Columnar Export
+  // ========================================================
+  it('should export valid Parquet-compatible columnar data for trial results', async () => {
+    const parquetRes = await request(app)
+      .get(`/api/v1/experiments/${experimentIdA}/results/export.parquet`)
+      .set(authHeader);
+    expect(parquetRes.status).toBe(200);
+    expect(parquetRes.headers['content-type']).toContain('application/json');
+    expect(parquetRes.headers['content-disposition']).toContain(
+      `attachment; filename="experiment_${experimentIdA}_parquet.json"`
+    );
+    expect(parquetRes.body.schema.specification).toBe('PARQUET_COMPATIBLE_COLUMNAR_v1');
+    expect(parquetRes.body.schema.experimentId).toBe(experimentIdA);
+    expect(parquetRes.body.numRows).toBe(4);
+    expect(parquetRes.body.columns.sessionId).toContain(session1Id);
+    expect(parquetRes.body.columns.submittedResponse).toContain('Space');
+    expect(parquetRes.body.columns.reactionTimeMs).toContain(200);
+  });
+
+  // ========================================================
   // 8. Experiment Isolation & Error Cases
   // ========================================================
   it('should isolate results between different experiments', async () => {

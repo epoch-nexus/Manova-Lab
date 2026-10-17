@@ -4,3 +4,4 @@ export * from './experiment.schema.js';
 export * from './participant.schema.js';
 export * from './results.schema.js';
 export * from './auth.schema.js';
+export * from './survey.schema.js';

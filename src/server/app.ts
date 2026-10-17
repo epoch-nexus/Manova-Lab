@@ -6,6 +6,7 @@ import { experimentRouter } from './routes/experiment.routes.js';
 import { participantRouter } from './routes/participant.routes.js';
 import { resultsRouter } from './routes/results.routes.js';
 import { authRouter } from './routes/auth.routes.js';
+import { surveyRouter } from './routes/survey.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { prisma } from '../db/prisma.js';
 import { config } from '../config/env.js';
@@ -48,7 +49,7 @@ export function createApp(): Application {
 
   app.use((req, res, next) => {
     const isExperimentRoute =
-      req.path.startsWith('/api/v1/experiments') || req.path.startsWith('/experiments');
+      req.path.includes('/experiments') || req.path.includes('/protocols') || req.path.includes('/surveys');
     const isPostOrPut = req.method === 'POST' || req.method === 'PUT';
 
     if (isExperimentRoute && isPostOrPut) {
@@ -90,19 +91,45 @@ export function createApp(): Application {
 
   // Mount Researcher Auth Router
   app.use('/api/v1/auth', authRouter);
+  app.use('/api/auth', authRouter);
   app.use('/auth', authRouter);
 
-  // Mount Researcher Experiments Router (both versioned and direct root paths)
+  // Mount Researcher Experiments & Protocols Router (versioned, unversioned, and direct root paths)
   app.use('/api/v1/experiments', experimentRouter);
+  app.use('/api/experiments', experimentRouter);
   app.use('/experiments', experimentRouter);
+  app.use('/api/v1/protocols', experimentRouter);
+  app.use('/api/protocols', experimentRouter);
+  app.use('/protocols', experimentRouter);
 
-  // Mount Participant Execution Router (both versioned and direct root paths)
+  // Mount Survey Assays Router (versioned, unversioned, and direct root paths)
+  app.use('/api/v1/surveys', surveyRouter);
+  app.use('/api/surveys', surveyRouter);
+  app.use('/surveys', surveyRouter);
+
+  // Mount Participant Execution Router (versioned, unversioned, and direct root paths)
   app.use('/api/v1/participant', participantRouter);
+  app.use('/api/participant', participantRouter);
   app.use('/participant', participantRouter);
 
-  // Mount Researcher Results Analytics & Export Router
-  app.use('/api/v1/experiments/:experimentId/results', resultsRouter);
-  app.use('/experiments/:experimentId/results', resultsRouter);
+  // Mount Researcher Results Analytics & Export Router across all experiment and protocol aliases
+  const resultsPaths = [
+    '/api/v1/experiments/:experimentId/results',
+    '/api/experiments/:experimentId/results',
+    '/experiments/:experimentId/results',
+    '/api/v1/experiments/:id/results',
+    '/api/experiments/:id/results',
+    '/experiments/:id/results',
+    '/api/v1/protocols/:experimentId/results',
+    '/api/protocols/:experimentId/results',
+    '/protocols/:experimentId/results',
+    '/api/v1/protocols/:id/results',
+    '/api/protocols/:id/results',
+    '/protocols/:id/results',
+  ];
+  for (const resultsPath of resultsPaths) {
+    app.use(resultsPath, resultsRouter);
+  }
 
   // JSON 404 handler for unknown routes
   app.use((_req: Request, res: Response) => {

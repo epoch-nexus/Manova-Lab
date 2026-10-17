@@ -20,9 +20,8 @@ resultsRouter.get(
   '/',
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const experimentId = Array.isArray(req.params.experimentId)
-        ? req.params.experimentId[0]!
-        : req.params.experimentId!;
+      const rawExpId = req.params.experimentId || req.params.id || req.params.experiment_id;
+      const experimentId = Array.isArray(rawExpId) ? rawExpId[0]! : (rawExpId as string);
       const researcherId = req.researcher!.id;
       const query = resultsQuerySchema.parse(req.query);
       const data = await resultsService.getRawResults(experimentId, query, researcherId);
@@ -41,9 +40,8 @@ resultsRouter.get(
   '/summary',
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const experimentId = Array.isArray(req.params.experimentId)
-        ? req.params.experimentId[0]!
-        : req.params.experimentId!;
+      const rawExpId = req.params.experimentId || req.params.id || req.params.experiment_id;
+      const experimentId = Array.isArray(rawExpId) ? rawExpId[0]! : (rawExpId as string);
       const researcherId = req.researcher!.id;
       const query = resultsSummaryQuerySchema.parse(req.query);
       const summary = await resultsService.getSummary(experimentId, query, researcherId);
@@ -62,9 +60,8 @@ resultsRouter.get(
   '/export.json',
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const experimentId = Array.isArray(req.params.experimentId)
-        ? req.params.experimentId[0]!
-        : req.params.experimentId!;
+      const rawExpId = req.params.experimentId || req.params.id || req.params.experiment_id;
+      const experimentId = Array.isArray(rawExpId) ? rawExpId[0]! : (rawExpId as string);
       const researcherId = req.researcher!.id;
       const query = resultsQuerySchema.parse(req.query);
       const exportData = await resultsService.exportJson(experimentId, query, researcherId);
@@ -89,9 +86,8 @@ resultsRouter.get(
   '/export.csv',
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const experimentId = Array.isArray(req.params.experimentId)
-        ? req.params.experimentId[0]!
-        : req.params.experimentId!;
+      const rawExpId = req.params.experimentId || req.params.id || req.params.experiment_id;
+      const experimentId = Array.isArray(rawExpId) ? rawExpId[0]! : (rawExpId as string);
       const researcherId = req.researcher!.id;
       const query = resultsQuerySchema.parse(req.query);
       const csvData = await resultsService.exportCsv(experimentId, query, researcherId);
@@ -102,6 +98,32 @@ resultsRouter.get(
         `attachment; filename="experiment_${experimentId}_results.csv"`
       );
       res.status(200).send(csvData);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * GET /api/v1/experiments/:experimentId/results/export.parquet
+ * Generates and downloads a Parquet-compatible columnar results export.
+ */
+resultsRouter.get(
+  '/export.parquet',
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const rawExpId = req.params.experimentId || req.params.id || req.params.experiment_id;
+      const experimentId = Array.isArray(rawExpId) ? rawExpId[0]! : (rawExpId as string);
+      const researcherId = req.researcher!.id;
+      const query = resultsQuerySchema.parse(req.query);
+      const parquetData = await resultsService.exportParquetCompatible(experimentId, query, researcherId);
+
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="experiment_${experimentId}_parquet.json"`
+      );
+      res.status(200).json(parquetData);
     } catch (err) {
       next(err);
     }

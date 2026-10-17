@@ -18,6 +18,12 @@ export default function CreateProtocolModal({ isOpen, onClose, onCreated }) {
       return;
     }
 
+    if (preset.includes('Survey Assay')) {
+      onClose();
+      navigate('/builder/survey');
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
 
@@ -200,7 +206,7 @@ export default function CreateProtocolModal({ isOpen, onClose, onCreated }) {
       onClose();
 
       const targetId = created.id || experimentId;
-      navigate(`/builder/${targetId}`);
+      navigate(`/builder?id=${targetId}`);
     } catch (err) {
       console.error('Create protocol failed', err);
       setError(err instanceof Error ? err.message : 'Server error occurred.');
@@ -253,11 +259,12 @@ export default function CreateProtocolModal({ isOpen, onClose, onCreated }) {
             <label className="font-mono text-xs text-on-surface uppercase tracking-wider block mb-1.5 font-semibold">
               Base Paradigm Preset
             </label>
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
               {[
                 { name: 'Visual Stroop', desc: 'Word & ink color interference', val: 'Visual Stroop (Word/Color)' },
                 { name: 'Go / No-Go', desc: 'Impulse control & vigilance', val: 'Go / No-Go Sustained Attention' },
                 { name: 'N-Back', desc: 'Multi-modal working memory', val: 'N-Back Working Memory Protocol' },
+                { name: 'Survey Assay', desc: 'Likert 1-7, Choice & Dwell telemetry', val: 'Survey Assay (Multi-Item)' },
                 { name: 'Blank Canvas', desc: 'Empty custom state machine', val: 'Blank Canvas Protocol' },
               ].map((item) => (
                 <button

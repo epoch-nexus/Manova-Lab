@@ -37,8 +37,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Default fallback mock user if token exists or local dev session
     if (localStorage.getItem('token') || localStorage.getItem('accessToken')) {
       return {
-        email: 'researcher@manovalabs.org',
-        name: 'Lead Researcher',
+        email: 'dr.arun@stanford.edu',
+        name: 'Dr. Arun Vance',
         photoURL: null,
       };
     }
@@ -48,7 +48,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const initAuth = async () => {
-      const storedToken = localStorage.getItem('token') || localStorage.getItem('accessToken');
+      let storedToken = localStorage.getItem('token') || localStorage.getItem('accessToken');
+      let authenticated = false;
+
       if (storedToken) {
         try {
           const profile = await api.auth.me();
@@ -60,13 +62,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               photoURL: profile.photoURL || null,
             };
             setUser(userData);
+            setToken(storedToken);
             localStorage.setItem('user', JSON.stringify(userData));
+            authenticated = true;
           }
         } catch {
-          // Token expired or invalid
-          console.warn('Could not refresh profile from server');
+          // Stored token is invalid or expired
+          console.warn('Stored token expired or invalid, auto-renewing demo session...');
         }
       }
+
+      if (!authenticated) {
+        // Auto-login with default demo researcher credentials
+        try {
+          const res = await api.auth.login('dr.arun@stanford.edu', 'StanfordPrecision#2025');
+          if (res?.token) {
+            const userData: User = {
+              id: res.researcher?.id,
+              email: res.researcher?.email || 'dr.arun@stanford.edu',
+              name: res.researcher?.name || 'Dr. Arun Vance',
+              photoURL: null,
+            };
+            setToken(res.token);
+            setUser(userData);
+            localStorage.setItem('token', res.token);
+            localStorage.setItem('accessToken', res.token);
+            localStorage.setItem('user', JSON.stringify(userData));
+          }
+        } catch (err) {
+          console.warn('Auto-login fallback unavailable:', err);
+        }
+      }
+
       setIsLoading(false);
     };
 

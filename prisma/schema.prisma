@@ -195,3 +195,61 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+model Survey {
+  id              String           @id @default(uuid())
+  title           String
+  description     String?
+  preset          String           @default("Survey")
+  config          Json?
+  questions       Json             // Array of SurveyQuestion (multiple_choice, likert, matrix, open_text)
+  surveyQuestions SurveyQuestion[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  responses       SurveyResponse[]
+
+  @@map("surveys")
+}
+
+model SurveyQuestion {
+  id          String   @id @default(uuid())
+  surveyId    String
+  survey      Survey   @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  orderIndex  Int      @default(0)
+  type        String   // 'multiple_choice' | 'likert' | 'matrix' | 'open_text'
+  prompt      String
+  description String?
+  required    Boolean  @default(true)
+  options     Json?    // For multiple_choice: string[]
+  scaleMin    Int?     @default(1)
+  scaleMax    Int?     @default(7)
+  minLabel    String?
+  midLabel    String?
+  maxLabel    String?
+  rows        Json?    // For matrix: string[] (row items)
+  columns     Json?    // For matrix: string[] (column options)
+  validation  Json?    // Min/max length, etc.
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([surveyId])
+  @@index([orderIndex])
+  @@map("survey_questions")
+}
+
+model SurveyResponse {
+  id              String   @id @default(uuid())
+  surveyId        String
+  survey          Survey   @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  respondentToken String?  @default(uuid())
+  participantId   String?  @default(uuid())
+  answers         Json     // Array of answer records: { questionId, questionType, response, dwellTimeMs, startedAtMs, submittedAtMs }
+  totalDurationMs Float
+  clientMetadata  Json?
+  submittedAt     DateTime @default(now())
+
+  @@index([surveyId])
+  @@index([submittedAt])
+  @@map("survey_responses")
+}
+
+

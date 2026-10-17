@@ -176,8 +176,11 @@ export class SessionService {
     );
   }
 
-  /**
+    /**
    * Accepts participant response and atomically advances session along linear sequence.
+   * The guarded updateMany is the FIRST write: it claims the current trial. Postgres row-locks
+   * the session row, so a concurrent request waits, re-evaluates the WHERE clause after the
+   * winner commits, matches 0 rows, and is rejected before it can insert a duplicate response.
    */
   async submitResponse(
     sessionId: string,
@@ -190,9 +193,7 @@ export class SessionService {
       // 1. Fetch session with snapshot data
       const session = await tx.session.findUnique({
         where: { id: sessionId },
-        include: {
-          version: true,
-        },
+        include: { version: true },
       });
 
       if (!session) {
@@ -200,17 +201,11 @@ export class SessionService {
       }
 
       if (session.status === 'COMPLETED') {
-        throw new ConflictError(
-          'This session has already ended.',
-          'SESSION_ALREADY_COMPLETED'
-        );
+        throw new ConflictError('This session has already ended.', 'SESSION_ALREADY_COMPLETED');
       }
 
       if (session.status === 'ABANDONED') {
-        throw new ConflictError(
-          'This session was abandoned.',
-          'SESSION_ALREADY_COMPLETED'
-        );
+        throw new ConflictError('This session was abandoned.', 'SESSION_ALREADY_COMPLETED');
       }
 
       // 2. Prevent stale or out-of-order trial responses
@@ -236,26 +231,27 @@ export class SessionService {
         validated.reactionTimeMs ?? null
       );
 
-      // Check that this trial has not already been answered in this session
+      const rawTrialOrder = session.trialOrder as string[] | null;
+      const sessionState = {
+        id: session.id,
+        experimentId: session.experimentId,
+        status: session.status,
+        executionState: session.executionState,
+        currentTrialId: session.currentTrialId,
+        currentTrialIndex: session.currentTrialIndex,
+        totalTrials: session.totalTrials,
+        trialOrder: rawTrialOrder,
+        randomizationEnabled: session.randomizationEnabled,
+      };
+
+      // Idempotency replay: this trial already has a response recorded
       const existingResponse = await tx.sessionResponse.findFirst({
         where: { sessionId: session.id, trialId },
         select: { id: true },
       });
       if (existingResponse) {
-        // Idempotency replay: return the existing response data and current next step
-        const rawTrialOrder = session.trialOrder as string[] | null;
         const replayTransition = this.engine.advanceLinearSequence(
-          {
-            id: session.id,
-            experimentId: session.experimentId,
-            status: session.status,
-            executionState: session.executionState,
-            currentTrialId: session.currentTrialId,
-            currentTrialIndex: session.currentTrialIndex,
-            totalTrials: session.totalTrials,
-            trialOrder: rawTrialOrder,
-            randomizationEnabled: session.randomizationEnabled,
-          },
+          sessionState,
           snapshot,
           trialId,
           null
@@ -270,7 +266,7 @@ export class SessionService {
         };
       }
 
-      // Evaluate correctness against the frozen ExperimentVersion snapshot
+      // 4. Evaluate correctness against the frozen ExperimentVersion snapshot
       let isCorrect: boolean | null = null;
       if (currentTrial.expectedResponse.evaluationMode === 'exact_match') {
         if (timedOut || !validated.submittedResponse) {
@@ -279,65 +275,19 @@ export class SessionService {
           isCorrect =
             validated.submittedResponse === currentTrial.expectedResponse.correctResponse;
         }
-      } else if (currentTrial.expectedResponse.evaluationMode === 'none') {
-        isCorrect = null;
       }
 
-      // 4. Record session response (enforces unique constraint per session & trial)
-      const responseId = `resp_${crypto.randomUUID()}`;
-      try {
-        await tx.sessionResponse.create({
-          data: {
-            id: responseId,
-            sessionId: session.id,
-            trialId: trialId,
-            submittedResponse: validated.submittedResponse ?? null,
-            isCorrect,
-            reactionTimeMs: validated.reactionTimeMs ?? null,
-            timedOut: timedOut,
-            timingMeasurement: (validated.timingMeasurement ?? Prisma.DbNull) as Prisma.InputJsonValue,
-            clientMetadata: (validated.clientMetadata ?? Prisma.DbNull) as Prisma.InputJsonValue,
-          },
-        });
-      } catch (err: unknown) {
-        // P2002 unique constraint violation = concurrent race lost; pre-check above
-        // handles genuine retries, so arriving here means another request won.
-        if (
-          err instanceof Prisma.PrismaClientKnownRequestError &&
-          err.code === 'P2002'
-        ) {
-          throw new ConflictError(
-            'Session response already recorded for this trial. Concurrent response conflict.',
-            'SESSION_ALREADY_COMPLETED'
-          );
-        }
-        throw err;
-      }
-
-      const rawTrialOrder = session.trialOrder as string[] | null;
-
-      // 5. Compute transition
+      // 5. Compute the transition (pure function of the session row + trial + correctness)
       const transition = this.engine.advanceLinearSequence(
-        {
-          id: session.id,
-          experimentId: session.experimentId,
-          status: session.status,
-          executionState: session.executionState,
-          currentTrialId: session.currentTrialId,
-          currentTrialIndex: session.currentTrialIndex,
-          totalTrials: session.totalTrials,
-          trialOrder: rawTrialOrder,
-          randomizationEnabled: session.randomizationEnabled,
-        },
+        sessionState,
         snapshot,
         trialId,
         isCorrect
       );
 
-      // 6. Atomically advance session — combines the concurrency lock (WHERE currentTrialId)
-      //    with the actual state update in one round-trip. count=0 means a concurrent
-      //    request already advanced the session past this trial.
-      const updateResult = await tx.session.updateMany({
+      // 6. Atomic claim: advance the session only if it is still on this trial and in progress.
+      //    This is the first write, so the loser of a race never reaches the insert below.
+      const claim = await tx.session.updateMany({
         where: { id: sessionId, currentTrialId: trialId, status: 'IN_PROGRESS' },
         data: {
           status: transition.sessionStatus,
@@ -348,12 +298,28 @@ export class SessionService {
         },
       });
 
-      if (updateResult.count === 0) {
+      if (claim.count === 0) {
         throw new ConflictError(
           'Session has already advanced past this trial. Concurrent response conflict.',
           'SESSION_ALREADY_COMPLETED'
         );
       }
+
+      // 7. Record the response (we hold the claim, so no duplicate can exist)
+      const responseId = `resp_${crypto.randomUUID()}`;
+      await tx.sessionResponse.create({
+        data: {
+          id: responseId,
+          sessionId: session.id,
+          trialId: trialId,
+          submittedResponse: validated.submittedResponse ?? null,
+          isCorrect,
+          reactionTimeMs: validated.reactionTimeMs ?? null,
+          timedOut: timedOut,
+          timingMeasurement: (validated.timingMeasurement ?? Prisma.DbNull) as Prisma.InputJsonValue,
+          clientMetadata: (validated.clientMetadata ?? Prisma.DbNull) as Prisma.InputJsonValue,
+        },
+      });
 
       // Determine isCorrect visibility based on showFeedback config
       const showFeedback = snapshot.config?.showFeedback !== false;

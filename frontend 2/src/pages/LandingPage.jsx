@@ -260,9 +260,13 @@ export default function LandingPage() {
 
             <FadeIn delay={100}>
               <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-                <Link to="/builder" className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md hover:shadow-lg hover:shadow-emerald-600/20 transition-all text-base">
+                <Link to="/dashboard" className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md hover:shadow-lg hover:shadow-emerald-600/20 transition-all text-base">
+                  <span className="material-symbols-outlined text-[20px]">grid_view</span>
+                  <span>Open Dashboard</span>
+                </Link>
+                <Link to="/builder" className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-white hover:bg-slate-50 text-slate-800 font-semibold border border-slate-200 shadow-xs transition-all text-base hover:border-slate-300">
                   <span>Create Experiment</span>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                     <path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" strokeLinecap="round" strokeLinejoin="round"></path>
                   </svg>
                 </Link>

@@ -1,17 +1,32 @@
 import { z } from 'zod';
 import { trialSchema } from './trial.schema.js';
 
-export const randomizationConfigSchema = z.object({
-  enabled: z.boolean().default(false),
-});
+export const randomizationConfigSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+  })
+  .passthrough();
 
-export const experimentDisplayConfigSchema = z.object({
-  displayMode: z.enum(['fullscreen', 'windowed']).default('fullscreen'),
-  backgroundColor: z.string().default('#0F172A'),
-  allowPause: z.boolean().default(false),
-  showFeedback: z.boolean().default(true),
-  randomization: randomizationConfigSchema.optional().default({ enabled: false }),
-});
+export const nodeGraphSchema = z
+  .object({
+    nodes: z.array(z.any()).default([]),
+    edges: z.array(z.any()).default([]),
+  })
+  .passthrough();
+
+export const experimentDisplayConfigSchema = z
+  .object({
+    displayMode: z.enum(['fullscreen', 'windowed']).default('fullscreen'),
+    backgroundColor: z.string().default('#0F172A'),
+    allowPause: z.boolean().default(false),
+    showFeedback: z.boolean().default(true),
+    randomization: randomizationConfigSchema.optional().default({ enabled: false }),
+    preset: z.string().optional(),
+    nodeGraph: nodeGraphSchema.optional(),
+    bidsSchema: z.record(z.any()).optional(),
+    bids: z.record(z.any()).optional(),
+  })
+  .passthrough();
 
 export const DEFAULT_EXPERIMENT_CONFIG: z.infer<typeof experimentDisplayConfigSchema> = {
   displayMode: 'fullscreen',
@@ -56,12 +71,15 @@ export const publicSlugSchema = z
 
 export const createExperimentSchema = z
   .object({
+    id: z.string().optional(),
     title: z
       .string()
       .min(3, 'Experiment title must be at least 3 characters')
       .max(120, 'Experiment title must be at most 120 characters'),
     description: z.string().min(1, 'Experiment description is required'),
     publicSlug: publicSlugSchema,
+    preset: z.string().optional(),
+    nodeGraph: nodeGraphSchema.optional(),
     generalInstructions: z.string().max(5000).nullable().optional(),
     completionMessage: z.string().max(5000).nullable().optional(),
     config: z
@@ -100,9 +118,11 @@ export const updateExperimentSchema = z
       .optional(),
     description: z.string().min(1, 'Experiment description is required').optional(),
     publicSlug: publicSlugSchema.optional(),
+    preset: z.string().optional(),
+    nodeGraph: nodeGraphSchema.optional(),
     generalInstructions: z.string().max(5000).nullable().optional(),
     completionMessage: z.string().max(5000).nullable().optional(),
-    config: experimentDisplayConfigSchema.partial().optional(),
+    config: experimentDisplayConfigSchema.partial().passthrough().optional(),
     trials: z.array(trialSchema).optional(),
   })
   .superRefine((val, ctx) => {

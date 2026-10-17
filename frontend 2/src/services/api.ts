@@ -137,6 +137,30 @@ export const api = {
       const q = query ? `?${new URLSearchParams(query).toString()}` : '';
       return fetchClient(`/experiments/${experimentId}/results/export.json${q}`);
     },
+    exportParquet: (experimentId: string, query?: Record<string, any>) => {
+      const q = query ? `?${new URLSearchParams(query).toString()}` : '';
+      return fetchClient(`/experiments/${experimentId}/results/export.parquet${q}`);
+    },
+  },
+  surveys: {
+    create: (data: any) =>
+      fetchClient('/surveys', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    get: (id: string) => fetchClient(`/surveys/${id}`),
+    submit: (id: string, data: any) =>
+      fetchClient(`/surveys/${id}/submit`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    list: () => fetchClient('/surveys'),
+    getResponses: (id: string) => fetchClient(`/surveys/${id}/responses`),
+    exportCsv: (id: string) =>
+      fetchClient(`/surveys/${id}/export.csv`, {
+        headers: { Accept: 'text/csv' },
+      }),
+    exportParquet: (id: string) => fetchClient(`/surveys/${id}/export.parquet`),
   },
 };
 

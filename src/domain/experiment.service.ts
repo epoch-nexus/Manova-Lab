@@ -43,7 +43,7 @@ export class ExperimentService {
     const preset =
       exp.preset ||
       (rawConfig && typeof rawConfig === 'object' ? (rawConfig as any).preset : undefined) ||
-      'Visual Stroop';
+      'Custom Protocol';
     const isoCreated = typeof exp.createdAt === 'string' ? exp.createdAt : exp.createdAt.toISOString();
     return {
       id: exp.id,
@@ -126,19 +126,32 @@ export class ExperimentService {
           );
         }
 
+        const expId = validated.id || randomUUID();
+        const baseConfig = (validated.config ?? {
+          displayMode: 'fullscreen',
+          backgroundColor: '#0F172A',
+          allowPause: false,
+          showFeedback: true,
+        }) as Record<string, any>;
+
+        const preset = validated.preset || baseConfig.preset;
+        const nodeGraph = validated.nodeGraph || baseConfig.nodeGraph;
+
+        const finalConfig = {
+          ...baseConfig,
+          ...(preset ? { preset } : {}),
+          ...(nodeGraph ? { nodeGraph } : {}),
+        };
+
         const exp = await tx.experiment.create({
           data: {
+            id: expId,
             title: validated.title,
             description: validated.description,
             publicSlug: validated.publicSlug,
             generalInstructions: validated.generalInstructions ?? null,
             completionMessage: validated.completionMessage ?? null,
-            config: (validated.config ?? {
-              displayMode: 'fullscreen',
-              backgroundColor: '#0F172A',
-              allowPause: false,
-              showFeedback: true,
-            }) as Prisma.InputJsonValue,
+            config: finalConfig as Prisma.InputJsonValue,
             status: 'DRAFT',
             version: 1,
             ownerResearcherId: researcherId,
@@ -157,6 +170,7 @@ export class ExperimentService {
             version: true,
             ownerResearcherId: true,
             publicSlug: true,
+            config: true,
             createdAt: true,
             updatedAt: true,
           },
@@ -177,6 +191,7 @@ export class ExperimentService {
           ...created,
           trialCount: validated.trials?.length ?? 0,
         }),
+        config: created.config,
         ownerResearcherId: created.ownerResearcherId,
         trialIdMap,
       };
@@ -212,7 +227,7 @@ export class ExperimentService {
     const targetId = researcher ? researcher.id : researcherId;
     const targetEmail = researcher ? researcher.email : (researcherId.includes('@') ? researcherId : undefined);
 
-    const experiments = await prisma.experiment.findMany({
+    let experiments = await prisma.experiment.findMany({
       where: {
         OR: [
           { ownerResearcherId: targetId },
@@ -226,6 +241,19 @@ export class ExperimentService {
         },
       },
     });
+
+    // If no experiments found for this researcher account, fall back to returning available starter/public experiments
+    if (experiments.length === 0) {
+      experiments = await prisma.experiment.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        include: {
+          _count: {
+            select: { trials: true },
+          },
+        },
+      });
+    }
 
     return {
       experiments: experiments.map((exp) => this.toListItem(exp)),
@@ -242,8 +270,26 @@ export class ExperimentService {
       throw new UnauthorizedError('Authentication required');
     }
 
+    const researcher = await prisma.researcher.findFirst({
+      where: {
+        OR: [
+          { id: researcherId },
+          { email: researcherId },
+        ],
+      },
+      select: { id: true, email: true },
+    });
+
+    const targetResearcherId = researcher ? researcher.id : researcherId;
+
     const exp = await prisma.experiment.findFirst({
-      where: { id, ownerResearcherId: researcherId },
+      where: {
+        OR: [
+          { id },
+          { publicSlug: id },
+        ],
+        ownerResearcherId: targetResearcherId,
+      },
       include: {
         trials: {
           orderBy: { orderIndex: 'asc' },
@@ -298,12 +344,17 @@ export class ExperimentService {
         const newStatus = isPublished ? 'DRAFT' : existing.status;
 
         // Merge partial config over stored config
-        const mergedConfig = validated.config
-          ? {
-              ...((existing.config as Record<string, unknown>) ?? {}),
-              ...validated.config,
-            }
-          : existing.config;
+        const existingConfig = (existing.config as Record<string, unknown>) ?? {};
+        const incomingConfig = (validated.config as Record<string, unknown>) ?? {};
+        const nodeGraph = validated.nodeGraph || incomingConfig.nodeGraph || existingConfig.nodeGraph;
+        const preset = validated.preset || incomingConfig.preset || (existingConfig as any).preset;
+
+        const mergedConfig = {
+          ...existingConfig,
+          ...incomingConfig,
+          ...(nodeGraph ? { nodeGraph } : {}),
+          ...(preset ? { preset } : {}),
+        };
 
         let trialIdMap: Record<string, string> = {};
         let prismaTrials: Prisma.TrialCreateWithoutExperimentInput[] | undefined;
@@ -386,6 +437,7 @@ export class ExperimentService {
             title: true,
             status: true,
             version: true,
+            config: true,
             updatedAt: true,
           },
         });
@@ -678,9 +730,89 @@ export class ExperimentService {
   }
 
   /**
+   * Dynamically deserializes database trials into React Flow nodeGraph (nodes & edges)
+   * with dynamic BIDS schema metadata (not hardcoded to Stroop / color-naming template).
+   */
+  private deserializeNodeGraphFromTrials(trials: any[]): { nodes: any[]; edges: any[] } {
+    if (!trials || trials.length === 0) {
+      return { nodes: [], edges: [] };
+    }
+
+    const nodes: any[] = [];
+    const edges: any[] = [];
+
+    trials.forEach((trial: any, idx: number) => {
+      const stim = trial.stimulus || {};
+      const expResp = trial.expectedResponse || {};
+      const type = stim.type === 'image' ? 'stimulus' : 'stimulus';
+
+      const nodeId = trial.id || `node-trial-${trial.orderIndex ?? idx + 1}`;
+      const bidsStimulus =
+        stim.type === 'text'
+          ? { text: stim.content ?? '', styling: stim.styling ?? {} }
+          : { url: stim.url ?? '', alt: stim.altText ?? '' };
+
+      nodes.push({
+        id: nodeId,
+        type,
+        position: { x: 80 + idx * 340, y: 150 + (idx % 2) * 60 },
+        data: {
+          label: trial.label || `TRIAL_${trial.orderIndex ?? idx + 1}`,
+          type,
+          title: trial.label || `Trial #${trial.orderIndex ?? idx + 1}`,
+          description: trial.instructions || '',
+          text: stim.content || '',
+          ink: stim.styling?.color || '#10b981',
+          dwell: trial.timingConfig?.stimulusDurationMs ?? 1000,
+          isi: trial.timingConfig?.preStimulusDelayMs ?? 350,
+          congruency: stim.metadata?.congruency || 'neutral',
+          allowedKeys: expResp.allowedKeys || [],
+          correctResponse: expResp.correctResponse ?? undefined,
+          timeoutMs: trial.timingConfig?.responseTimeoutMs ?? 1500,
+          bids: {
+            trial_id: trial.id,
+            order_index: trial.orderIndex,
+            stimulus_type: stim.type || 'text',
+            stimulus: bidsStimulus,
+            allowed_keys: expResp.allowedKeys || [],
+            correct_response: expResp.correctResponse || null,
+            evaluation_mode: expResp.evaluationMode || 'exact_match',
+          },
+        },
+      });
+
+      if (idx > 0) {
+        const prevId = nodes[idx - 1].id;
+        edges.push({
+          id: `e-${prevId}-${nodeId}`,
+          source: prevId,
+          target: nodeId,
+          style: { stroke: '#10b981', strokeWidth: 2 },
+        });
+      }
+    });
+
+    return { nodes, edges };
+  }
+
+  /**
    * Formats raw Prisma record into typed Experiment entity.
    */
   private formatExperiment(exp: any): Experiment {
+    let config = typeof exp.config === 'object' && exp.config !== null ? { ...exp.config } : {};
+
+    // Dynamic BIDS / React Flow schema deserialization if nodeGraph is missing but trials exist
+    if (
+      (!config.nodeGraph || !config.nodeGraph.nodes || config.nodeGraph.nodes.length === 0) &&
+      exp.trials &&
+      exp.trials.length > 0
+    ) {
+      config = {
+        ...config,
+        nodeGraph: this.deserializeNodeGraphFromTrials(exp.trials),
+      };
+    }
+
     return {
       id: exp.id,
       title: exp.title,
@@ -691,7 +823,7 @@ export class ExperimentService {
       publicSlug: exp.publicSlug,
       generalInstructions: exp.generalInstructions,
       completionMessage: exp.completionMessage,
-      config: exp.config,
+      config,
       trials: (exp.trials || []).map(
         (t: any): Trial => ({
           id: t.id,

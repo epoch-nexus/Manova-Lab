@@ -254,6 +254,7 @@ export interface ResultRecord {
 
 export type ApiErrorCode =
   | 'EXPERIMENT_NOT_FOUND'
+  | 'SURVEY_NOT_FOUND'
   | 'INVALID_EXPERIMENT'
   | 'EXPERIMENT_NOT_PUBLISHED'
   | 'EXPERIMENT_ALREADY_PUBLISHED'

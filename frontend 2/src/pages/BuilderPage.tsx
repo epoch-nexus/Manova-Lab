@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   ReactFlow,
   Background,
@@ -19,29 +19,10 @@ import '@xyflow/react/dist/style.css';
 
 import api from '../services/api';
 import Header from '../components/Header';
-
-// -------------------------------------------------------------
-// Node Data Interface
-// -------------------------------------------------------------
-export interface ProtocolNodeData {
-  label: string;
-  type: 'instruction' | 'stimulus' | 'response' | 'branch' | 'iterator';
-  title: string;
-  description?: string;
-  text?: string;
-  ink?: string;
-  dwell?: number;
-  isi?: number;
-  congruency?: 'congruent' | 'incongruent' | 'neutral';
-  allowedKeys?: string[];
-  timeoutMs?: number;
-  condition?: string;
-  repetitions?: number;
-  bids?: Record<string, any>;
-  onDeleteNode?: (id: string) => void;
-}
-
-export type CustomNodeType = Node<ProtocolNodeData>;
+import SelectedNodeInspector from '../components/SelectedNodeInspector';
+import type { ProtocolNodeData, CustomNodeType } from '../components/SelectedNodeInspector';
+export type { ProtocolNodeData, CustomNodeType };
+export { SelectedNodeInspector };
 
 // -------------------------------------------------------------
 // Custom React Flow Node Components
@@ -49,26 +30,26 @@ export type CustomNodeType = Node<ProtocolNodeData>;
 const InstructionNodeComponent: React.FC<NodeProps<CustomNodeType>> = ({ id, data, selected }) => {
   return (
     <div
-      className={`w-64 bg-white rounded-xl shadow-md border transition-all select-none ${
+      className={`w-64 bg-white rounded-2xl shadow-xs border transition-all select-none ${
         selected
-          ? 'ring-2 ring-emerald-500 border-emerald-400 shadow-xl'
-          : 'border-slate-200 hover:shadow-lg'
+          ? 'ring-2 ring-teal-500 border-teal-400 shadow-md'
+          : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
       }`}
     >
       <div
-        className={`flex items-center justify-between pb-1.5 px-3 pt-2.5 rounded-t-xl border-b ${
-          selected ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'
+        className={`flex items-center justify-between pb-2 px-3.5 pt-3 rounded-t-2xl border-b ${
+          selected ? 'bg-teal-50/70 border-teal-100' : 'bg-slate-50 border-slate-200/80'
         }`}
       >
         <div className="flex items-center gap-1.5">
-          <span className="material-symbols-outlined text-[15px] text-emerald-700">assignment</span>
-          <span className="font-mono text-[11px] text-slate-800 uppercase font-bold truncate max-w-[130px]">
+          <span className="material-symbols-outlined text-[16px] text-teal-700">assignment</span>
+          <span className="font-mono text-[11px] text-slate-900 uppercase font-bold truncate max-w-[130px]">
             {data.label}
           </span>
         </div>
         <div className="flex items-center gap-1">
           {selected && (
-            <span className="px-1.5 py-0.2 bg-emerald-600 text-white rounded text-[9px] font-mono uppercase font-bold">
+            <span className="px-2.5 py-0.5 bg-teal-700 text-white rounded-full text-[9px] font-mono uppercase font-bold tracking-wider">
               ACTIVE
             </span>
           )}
@@ -78,7 +59,7 @@ const InstructionNodeComponent: React.FC<NodeProps<CustomNodeType>> = ({ id, dat
                 e.stopPropagation();
                 data.onDeleteNode?.(id);
               }}
-              className="text-slate-400 hover:text-rose-600 p-0.5 rounded cursor-pointer"
+              className="text-slate-400 hover:text-rose-600 p-0.5 rounded cursor-pointer transition-colors"
               title="Delete node"
             >
               <span className="material-symbols-outlined text-[14px]">close</span>
@@ -87,7 +68,7 @@ const InstructionNodeComponent: React.FC<NodeProps<CustomNodeType>> = ({ id, dat
         </div>
       </div>
 
-      <div className="p-3">
+      <div className="p-3.5">
         <div className="font-heading font-bold text-xs text-slate-900 mb-1">{data.title}</div>
         <p className="text-[11px] text-slate-500 leading-tight line-clamp-2">
           {data.description || 'Participant instruction briefing and consent form.'}
@@ -97,7 +78,7 @@ const InstructionNodeComponent: React.FC<NodeProps<CustomNodeType>> = ({ id, dat
       <Handle
         type="source"
         position={Position.Right}
-        className="!w-3 !h-3 !bg-emerald-600 !border-2 !border-white !-right-1.5 hover:!scale-125 transition-transform"
+        className="!w-3.5 !h-3.5 !bg-teal-600 !border-2 !border-white !-right-1.5 hover:!scale-125 transition-transform"
       />
     </div>
   );
@@ -106,32 +87,32 @@ const InstructionNodeComponent: React.FC<NodeProps<CustomNodeType>> = ({ id, dat
 const StimulusNodeComponent: React.FC<NodeProps<CustomNodeType>> = ({ id, data, selected }) => {
   return (
     <div
-      className={`w-64 bg-white rounded-xl shadow-md border transition-all select-none ${
+      className={`w-64 bg-white rounded-2xl shadow-xs border transition-all select-none ${
         selected
-          ? 'ring-2 ring-emerald-500 border-emerald-400 shadow-xl'
-          : 'border-slate-200 hover:shadow-lg'
+          ? 'ring-2 ring-teal-500 border-teal-400 shadow-md'
+          : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
       }`}
     >
       <Handle
         type="target"
         position={Position.Left}
-        className="!w-3 !h-3 !bg-emerald-600 !border-2 !border-white !-left-1.5 hover:!scale-125 transition-transform"
+        className="!w-3.5 !h-3.5 !bg-teal-600 !border-2 !border-white !-left-1.5 hover:!scale-125 transition-transform"
       />
 
       <div
-        className={`flex items-center justify-between pb-1.5 px-3 pt-2.5 rounded-t-xl border-b ${
-          selected ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'
+        className={`flex items-center justify-between pb-2 px-3.5 pt-3 rounded-t-2xl border-b ${
+          selected ? 'bg-teal-50/70 border-teal-100' : 'bg-slate-50 border-slate-200/80'
         }`}
       >
         <div className="flex items-center gap-1.5">
-          <span className="material-symbols-outlined text-[15px] text-emerald-700">visibility</span>
-          <span className="font-mono text-[11px] text-slate-800 uppercase font-bold truncate max-w-[130px]">
+          <span className="material-symbols-outlined text-[16px] text-teal-700">visibility</span>
+          <span className="font-mono text-[11px] text-slate-900 uppercase font-bold truncate max-w-[130px]">
             {data.label}
           </span>
         </div>
         <div className="flex items-center gap-1">
           {selected && (
-            <span className="px-1.5 py-0.2 bg-emerald-600 text-white rounded text-[9px] font-mono uppercase font-bold">
+            <span className="px-2.5 py-0.5 bg-teal-700 text-white rounded-full text-[9px] font-mono uppercase font-bold tracking-wider">
               ACTIVE
             </span>
           )}
@@ -141,7 +122,7 @@ const StimulusNodeComponent: React.FC<NodeProps<CustomNodeType>> = ({ id, data, 
                 e.stopPropagation();
                 data.onDeleteNode?.(id);
               }}
-              className="text-slate-400 hover:text-rose-600 p-0.5 rounded cursor-pointer"
+              className="text-slate-400 hover:text-rose-600 p-0.5 rounded cursor-pointer transition-colors"
               title="Delete node"
             >
               <span className="material-symbols-outlined text-[14px]">close</span>
@@ -150,12 +131,12 @@ const StimulusNodeComponent: React.FC<NodeProps<CustomNodeType>> = ({ id, data, 
         </div>
       </div>
 
-      <div className="p-3">
+      <div className="p-3.5">
         <div className="font-heading font-bold text-xs text-slate-900 mb-2">{data.title}</div>
-        <div className="flex flex-col items-center justify-center h-16 bg-slate-50 rounded-lg mb-2 border border-slate-100">
+        <div className="flex flex-col items-center justify-center h-16 bg-slate-50 rounded-xl mb-2.5 border border-slate-200">
           <span
             className="text-xl font-extrabold font-heading tracking-wider transition-colors"
-            style={{ color: data.ink || '#10b981' }}
+            style={{ color: data.ink || '#0D9488' }}
           >
             {data.text || '+'}
           </span>
@@ -165,16 +146,16 @@ const StimulusNodeComponent: React.FC<NodeProps<CustomNodeType>> = ({ id, data, 
             <span>ISI: {data.isi ?? 350}ms</span>
           </div>
         </div>
-        <div className="flex items-center justify-between text-[10px] font-mono text-slate-500">
+        <div className="flex items-center justify-between text-[10px] font-mono text-slate-600">
           <span className="capitalize">{data.congruency || 'congruent'}</span>
-          <span className="text-emerald-700 font-semibold">{data.ink || '#10b981'}</span>
+          <span className="text-teal-700 font-bold">{data.ink || '#0D9488'}</span>
         </div>
       </div>
 
       <Handle
         type="source"
         position={Position.Right}
-        className="!w-3 !h-3 !bg-emerald-600 !border-2 !border-white !-right-1.5 hover:!scale-125 transition-transform"
+        className="!w-3.5 !h-3.5 !bg-teal-600 !border-2 !border-white !-right-1.5 hover:!scale-125 transition-transform"
       />
     </div>
   );
@@ -183,32 +164,32 @@ const StimulusNodeComponent: React.FC<NodeProps<CustomNodeType>> = ({ id, data, 
 const ResponseNodeComponent: React.FC<NodeProps<CustomNodeType>> = ({ id, data, selected }) => {
   return (
     <div
-      className={`w-64 bg-white rounded-xl shadow-md border transition-all select-none ${
+      className={`w-64 bg-white rounded-2xl shadow-xs border transition-all select-none ${
         selected
-          ? 'ring-2 ring-emerald-500 border-emerald-400 shadow-xl'
-          : 'border-slate-200 hover:shadow-lg'
+          ? 'ring-2 ring-teal-500 border-teal-400 shadow-md'
+          : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
       }`}
     >
       <Handle
         type="target"
         position={Position.Left}
-        className="!w-3 !h-3 !bg-emerald-600 !border-2 !border-white !-left-1.5 hover:!scale-125 transition-transform"
+        className="!w-3.5 !h-3.5 !bg-teal-600 !border-2 !border-white !-left-1.5 hover:!scale-125 transition-transform"
       />
 
       <div
-        className={`flex items-center justify-between pb-1.5 px-3 pt-2.5 rounded-t-xl border-b ${
-          selected ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'
+        className={`flex items-center justify-between pb-2 px-3.5 pt-3 rounded-t-2xl border-b ${
+          selected ? 'bg-teal-50/70 border-teal-100' : 'bg-slate-50 border-slate-200/80'
         }`}
       >
         <div className="flex items-center gap-1.5">
-          <span className="material-symbols-outlined text-[15px] text-emerald-700">keyboard</span>
-          <span className="font-mono text-[11px] text-slate-800 uppercase font-bold truncate max-w-[130px]">
+          <span className="material-symbols-outlined text-[16px] text-teal-700">keyboard</span>
+          <span className="font-mono text-[11px] text-slate-900 uppercase font-bold truncate max-w-[130px]">
             {data.label}
           </span>
         </div>
         <div className="flex items-center gap-1">
           {selected && (
-            <span className="px-1.5 py-0.2 bg-emerald-600 text-white rounded text-[9px] font-mono uppercase font-bold">
+            <span className="px-2.5 py-0.5 bg-teal-700 text-white rounded-full text-[9px] font-mono uppercase font-bold tracking-wider">
               ACTIVE
             </span>
           )}
@@ -218,7 +199,7 @@ const ResponseNodeComponent: React.FC<NodeProps<CustomNodeType>> = ({ id, data, 
                 e.stopPropagation();
                 data.onDeleteNode?.(id);
               }}
-              className="text-slate-400 hover:text-rose-600 p-0.5 rounded cursor-pointer"
+              className="text-slate-400 hover:text-rose-600 p-0.5 rounded cursor-pointer transition-colors"
               title="Delete node"
             >
               <span className="material-symbols-outlined text-[14px]">close</span>
@@ -227,25 +208,25 @@ const ResponseNodeComponent: React.FC<NodeProps<CustomNodeType>> = ({ id, data, 
         </div>
       </div>
 
-      <div className="p-3">
+      <div className="p-3.5">
         <div className="font-heading font-bold text-xs text-slate-900 mb-2">{data.title}</div>
-        <div className="flex flex-wrap gap-1 mb-2 font-mono text-[10px]">
+        <div className="flex flex-wrap gap-1.5 mb-2.5 font-mono text-[10px]">
           {(data.allowedKeys || ['D', 'F', 'J', 'K']).map((k) => (
-            <span key={k} className="px-2 py-0.5 bg-slate-100 text-slate-800 font-bold rounded border border-slate-200">
+            <span key={k} className="px-2.5 py-0.5 bg-slate-50 text-slate-800 font-bold rounded-full border border-slate-200 shadow-2xs">
               {k}
             </span>
           ))}
         </div>
-        <div className="text-[10px] font-mono text-slate-400 flex items-center justify-between">
+        <div className="text-[10px] font-mono text-slate-500 flex items-center justify-between">
           <span>Timeout: {data.timeoutMs ?? 1200}ms</span>
-          <span className="text-emerald-700 font-semibold">Sub-ms Precision</span>
+          <span className="text-teal-700 font-bold">Sub-ms Precision</span>
         </div>
       </div>
 
       <Handle
         type="source"
         position={Position.Right}
-        className="!w-3 !h-3 !bg-emerald-600 !border-2 !border-white !-right-1.5 hover:!scale-125 transition-transform"
+        className="!w-3.5 !h-3.5 !bg-teal-600 !border-2 !border-white !-right-1.5 hover:!scale-125 transition-transform"
       />
     </div>
   );
@@ -254,32 +235,32 @@ const ResponseNodeComponent: React.FC<NodeProps<CustomNodeType>> = ({ id, data, 
 const BranchNodeComponent: React.FC<NodeProps<CustomNodeType>> = ({ id, data, selected }) => {
   return (
     <div
-      className={`w-64 bg-white rounded-xl shadow-md border transition-all select-none ${
+      className={`w-64 bg-white rounded-2xl shadow-xs border transition-all select-none ${
         selected
-          ? 'ring-2 ring-emerald-500 border-emerald-400 shadow-xl'
-          : 'border-slate-200 hover:shadow-lg'
+          ? 'ring-2 ring-teal-500 border-teal-400 shadow-md'
+          : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
       }`}
     >
       <Handle
         type="target"
         position={Position.Left}
-        className="!w-3 !h-3 !bg-emerald-600 !border-2 !border-white !-left-1.5 hover:!scale-125 transition-transform"
+        className="!w-3.5 !h-3.5 !bg-teal-600 !border-2 !border-white !-left-1.5 hover:!scale-125 transition-transform"
       />
 
       <div
-        className={`flex items-center justify-between pb-1.5 px-3 pt-2.5 rounded-t-xl border-b ${
-          selected ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'
+        className={`flex items-center justify-between pb-2 px-3.5 pt-3 rounded-t-2xl border-b ${
+          selected ? 'bg-teal-50/70 border-teal-100' : 'bg-slate-50 border-slate-200/80'
         }`}
       >
         <div className="flex items-center gap-1.5">
-          <span className="material-symbols-outlined text-[15px] text-emerald-700">alt_route</span>
-          <span className="font-mono text-[11px] text-slate-800 uppercase font-bold truncate max-w-[130px]">
+          <span className="material-symbols-outlined text-[16px] text-teal-700">alt_route</span>
+          <span className="font-mono text-[11px] text-slate-900 uppercase font-bold truncate max-w-[130px]">
             {data.label}
           </span>
         </div>
         <div className="flex items-center gap-1">
           {selected && (
-            <span className="px-1.5 py-0.2 bg-emerald-600 text-white rounded text-[9px] font-mono uppercase font-bold">
+            <span className="px-2.5 py-0.5 bg-teal-700 text-white rounded-full text-[9px] font-mono uppercase font-bold tracking-wider">
               ACTIVE
             </span>
           )}
@@ -289,7 +270,7 @@ const BranchNodeComponent: React.FC<NodeProps<CustomNodeType>> = ({ id, data, se
                 e.stopPropagation();
                 data.onDeleteNode?.(id);
               }}
-              className="text-slate-400 hover:text-rose-600 p-0.5 rounded cursor-pointer"
+              className="text-slate-400 hover:text-rose-600 p-0.5 rounded cursor-pointer transition-colors"
               title="Delete node"
             >
               <span className="material-symbols-outlined text-[14px]">close</span>
@@ -298,13 +279,13 @@ const BranchNodeComponent: React.FC<NodeProps<CustomNodeType>> = ({ id, data, se
         </div>
       </div>
 
-      <div className="p-3">
-        <div className="font-heading font-bold text-xs text-slate-900 mb-1">{data.title}</div>
-        <div className="text-[10px] font-mono text-slate-600 space-y-1 bg-slate-50 p-2 rounded border border-slate-100">
-          <div className="flex justify-between">
-            <span>On Correct:</span> <strong className="text-emerald-700">Next Trial →</strong>
+      <div className="p-3.5">
+        <div className="font-heading font-bold text-xs text-slate-900 mb-1.5">{data.title}</div>
+        <div className="text-[10px] font-mono text-slate-600 space-y-1.5 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+          <div className="flex justify-between items-center">
+            <span>On Correct:</span> <strong className="text-teal-700">Next Trial →</strong>
           </div>
-          <div className="flex justify-between">
+          <div className="flex justify-between items-center">
             <span>On Timeout:</span> <strong className="text-rose-600">Warning ↓</strong>
           </div>
         </div>
@@ -314,13 +295,13 @@ const BranchNodeComponent: React.FC<NodeProps<CustomNodeType>> = ({ id, data, se
         type="source"
         position={Position.Right}
         id="correct"
-        className="!w-3 !h-3 !bg-emerald-600 !border-2 !border-white !-right-1.5 hover:!scale-125 transition-transform"
+        className="!w-3.5 !h-3.5 !bg-teal-600 !border-2 !border-white !-right-1.5 hover:!scale-125 transition-transform"
       />
       <Handle
         type="source"
         position={Position.Bottom}
         id="timeout"
-        className="!w-3 !h-3 !bg-rose-500 !border-2 !border-white !-bottom-1.5 hover:!scale-125 transition-transform"
+        className="!w-3.5 !h-3.5 !bg-rose-500 !border-2 !border-white !-bottom-1.5 hover:!scale-125 transition-transform"
       />
     </div>
   );
@@ -329,32 +310,32 @@ const BranchNodeComponent: React.FC<NodeProps<CustomNodeType>> = ({ id, data, se
 const IteratorNodeComponent: React.FC<NodeProps<CustomNodeType>> = ({ id, data, selected }) => {
   return (
     <div
-      className={`w-64 bg-white rounded-xl shadow-md border transition-all select-none ${
+      className={`w-64 bg-white rounded-2xl shadow-xs border transition-all select-none ${
         selected
-          ? 'ring-2 ring-emerald-500 border-emerald-400 shadow-xl'
-          : 'border-slate-200 hover:shadow-lg'
+          ? 'ring-2 ring-teal-500 border-teal-400 shadow-md'
+          : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
       }`}
     >
       <Handle
         type="target"
         position={Position.Left}
-        className="!w-3 !h-3 !bg-emerald-600 !border-2 !border-white !-left-1.5 hover:!scale-125 transition-transform"
+        className="!w-3.5 !h-3.5 !bg-teal-600 !border-2 !border-white !-left-1.5 hover:!scale-125 transition-transform"
       />
 
       <div
-        className={`flex items-center justify-between pb-1.5 px-3 pt-2.5 rounded-t-xl border-b ${
-          selected ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'
+        className={`flex items-center justify-between pb-2 px-3.5 pt-3 rounded-t-2xl border-b ${
+          selected ? 'bg-teal-50/70 border-teal-100' : 'bg-slate-50 border-slate-200/80'
         }`}
       >
         <div className="flex items-center gap-1.5">
-          <span className="material-symbols-outlined text-[15px] text-emerald-700">sync</span>
-          <span className="font-mono text-[11px] text-slate-800 uppercase font-bold truncate max-w-[130px]">
+          <span className="material-symbols-outlined text-[16px] text-teal-700">sync</span>
+          <span className="font-mono text-[11px] text-slate-900 uppercase font-bold truncate max-w-[130px]">
             {data.label}
           </span>
         </div>
         <div className="flex items-center gap-1">
           {selected && (
-            <span className="px-1.5 py-0.2 bg-emerald-600 text-white rounded text-[9px] font-mono uppercase font-bold">
+            <span className="px-2.5 py-0.5 bg-teal-700 text-white rounded-full text-[9px] font-mono uppercase font-bold tracking-wider">
               ACTIVE
             </span>
           )}
@@ -364,7 +345,7 @@ const IteratorNodeComponent: React.FC<NodeProps<CustomNodeType>> = ({ id, data, 
                 e.stopPropagation();
                 data.onDeleteNode?.(id);
               }}
-              className="text-slate-400 hover:text-rose-600 p-0.5 rounded cursor-pointer"
+              className="text-slate-400 hover:text-rose-600 p-0.5 rounded cursor-pointer transition-colors"
               title="Delete node"
             >
               <span className="material-symbols-outlined text-[14px]">close</span>
@@ -373,10 +354,10 @@ const IteratorNodeComponent: React.FC<NodeProps<CustomNodeType>> = ({ id, data, 
         </div>
       </div>
 
-      <div className="p-3">
-        <div className="font-heading font-bold text-xs text-slate-900 mb-1">{data.title}</div>
-        <p className="text-[11px] text-slate-500 mb-2">Block loop counterbalancing and Latin square shuffle.</p>
-        <div className="text-[10px] font-mono bg-slate-50 px-2 py-1 rounded text-slate-600 flex justify-between">
+      <div className="p-3.5">
+        <div className="font-heading font-bold text-xs text-neutral-900 mb-1">{data.title}</div>
+        <p className="text-[11px] text-neutral-500 mb-2 leading-relaxed">Block loop counterbalancing and Latin square shuffle.</p>
+        <div className="text-[10px] font-mono bg-[#FAF9F5] px-2.5 py-1.5 rounded-xl text-neutral-700 flex justify-between border border-neutral-200/60">
           <span>Repetitions:</span>
           <strong>{data.repetitions ?? 12} Blocks</strong>
         </div>
@@ -385,7 +366,7 @@ const IteratorNodeComponent: React.FC<NodeProps<CustomNodeType>> = ({ id, data, 
       <Handle
         type="source"
         position={Position.Right}
-        className="!w-3 !h-3 !bg-emerald-600 !border-2 !border-white !-right-1.5 hover:!scale-125 transition-transform"
+        className="!w-3.5 !h-3.5 !bg-teal-600 !border-2 !border-white !-right-1.5 hover:!scale-125 transition-transform"
       />
     </div>
   );
@@ -411,10 +392,10 @@ const INITIAL_NODES: CustomNodeType[] = [
       label: 'INSTRUCTION_01',
       type: 'instruction',
       title: 'Participant Brief & Consent',
-      description: 'Identify ink color of target words using keys [D], [F], [J], [K]. Ignore semantic text meaning.',
+      description: 'Welcome to the experiment. Follow the onscreen prompts and respond as accurately as possible.',
       bids: {
         trial_type: 'instruction',
-        task_name: 'stroop_interference',
+        task_name: 'cognitive_protocol',
         consent_required: true,
       },
     },
@@ -447,17 +428,15 @@ const INITIAL_NODES: CustomNodeType[] = [
     data: {
       label: 'STIMULUS_TARGET',
       type: 'stimulus',
-      title: 'Stroop Target Stimulus',
-      text: 'RED',
+      title: 'Target Stimulus',
+      text: 'START',
       ink: '#10b981',
       dwell: 1000,
       isi: 350,
-      congruency: 'incongruent',
+      congruency: 'neutral',
       bids: {
         trial_type: 'visual_text',
-        semantic: 'RED',
-        ink_color: '#10b981',
-        congruent: false,
+        stimulus: 'START',
         duration_ms: 1000,
       },
     },
@@ -470,12 +449,12 @@ const INITIAL_NODES: CustomNodeType[] = [
       label: 'RESPONSE_CAPTURE',
       type: 'response',
       title: 'Raw Keydown Dispatch',
-      allowedKeys: ['D', 'F', 'J', 'K'],
-      timeoutMs: 1200,
+      allowedKeys: ['Space'],
+      timeoutMs: 2000,
       bids: {
         trial_type: 'response_capture',
-        allowed_inputs: ['D', 'F', 'J', 'K'],
-        timeout_ms: 1200,
+        allowed_inputs: ['Space'],
+        timeout_ms: 2000,
         precision: 'submillisecond_raf',
       },
     },
@@ -509,8 +488,15 @@ const INITIAL_EDGES: Edge[] = [
 // -------------------------------------------------------------
 function BuilderCanvas() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { id, experimentId } = useParams<{ id?: string; experimentId?: string }>();
-  const activeId = experimentId || id;
+  const activeId =
+    experimentId ||
+    id ||
+    searchParams.get('id') ||
+    searchParams.get('experiment_id') ||
+    searchParams.get('experimentId') ||
+    undefined;
   const reactFlowInstance = useReactFlow();
 
   // Active Experiment & Loading States
@@ -595,7 +581,7 @@ function BuilderCanvas() {
           setSelectedNodeId(data.config.nodeGraph.nodes[0].id);
         }
       } else if (data.trials && data.trials.length > 0) {
-        // Synthesize nodes & edges from trials
+        // Synthesize nodes & edges from trials dynamically
         const dynamicNodes: CustomNodeType[] = data.trials.map((trial: any, idx: number) => {
           const stim = trial.stimulus || {};
           const expResp = trial.expectedResponse || {};
@@ -605,22 +591,25 @@ function BuilderCanvas() {
             type,
             position: { x: 80 + idx * 340, y: 150 + (idx % 2) * 60 },
             data: {
-              label: trial.label || `TRIAL_${idx + 1}`,
+              label: trial.label || `TRIAL_${trial.orderIndex || idx + 1}`,
               type,
-              title: trial.label || `Trial #${idx + 1}`,
+              title: trial.label || `Trial #${trial.orderIndex || idx + 1}`,
               description: trial.instructions || '',
-              text: stim.content || 'TARGET',
+              text: stim.content || '',
               ink: stim.styling?.color || '#10b981',
               dwell: trial.timingConfig?.stimulusDurationMs || 1000,
               isi: trial.timingConfig?.preStimulusDelayMs || 350,
-              congruency: 'congruent',
-              allowedKeys: expResp.allowedKeys || ['D', 'F', 'J', 'K'],
-              timeoutMs: trial.timingConfig?.responseTimeoutMs || 1200,
+              congruency: stim.metadata?.congruency || 'neutral',
+              allowedKeys: expResp.allowedKeys || [],
+              correctResponse: expResp.correctResponse,
+              timeoutMs: trial.timingConfig?.responseTimeoutMs || 1500,
               bids: {
                 trial_id: trial.id,
                 order_index: trial.orderIndex,
                 stimulus_type: stim.type || 'text',
-                allowed_keys: expResp.allowedKeys,
+                stimulus: stim.content || stim.url || '',
+                allowed_keys: expResp.allowedKeys || [],
+                correct_response: expResp.correctResponse || null,
               },
             },
           };
@@ -647,25 +636,52 @@ function BuilderCanvas() {
       }
     } catch (err: any) {
       console.warn('Could not load protocol schema from backend:', err);
-      if (err.message?.includes('not found') || err.message?.includes('404')) {
-        setNotFound(true);
-      } else {
-        setExperiment({
-          id: activeId,
-          title: 'Custom Cognitive Protocol',
-          publicSlug: activeId,
-          version: 1,
-          status: 'DRAFT',
-        });
-      }
+      setNotFound(true);
     } finally {
       setLoading(false);
     }
   }, [activeId, setNodes, setEdges]);
 
   useEffect(() => {
-    fetchProtocol();
-  }, [fetchProtocol]);
+    if (!activeId) {
+      // Auto-initialize a fresh experiment with a unique ID so user is not stuck on PROTOCOL-DRAFT
+      const initDraft = async () => {
+        try {
+          const uniqueSlug = `protocol-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
+          const created = await api.experiments.create({
+            title: 'New Cognitive Protocol',
+            preset: 'Visual Stroop',
+            status: 'DRAFT',
+            description: 'Cognitive protocol assay.',
+            publicSlug: uniqueSlug,
+            config: {
+              displayMode: 'fullscreen',
+              backgroundColor: '#0F172A',
+              nodeGraph: { nodes: INITIAL_NODES, edges: INITIAL_EDGES },
+              bidsSchema: {
+                specification: 'BIDS-EXP-SPEC-1.8.2',
+                updatedAt: new Date().toISOString(),
+                totalNodes: INITIAL_NODES.length,
+                totalEdges: INITIAL_EDGES.length,
+              },
+            },
+          });
+          const newId = created?.id || created?.data?.id || created?.publicSlug;
+          if (newId) {
+            setExperiment(created);
+            navigate(`/builder?id=${newId}`, { replace: true });
+          }
+        } catch (e) {
+          console.warn('Auto-init draft offline/fallback:', e);
+        } finally {
+          setLoading(false);
+        }
+      };
+      initDraft();
+    } else {
+      fetchProtocol();
+    }
+  }, [activeId, fetchProtocol, navigate]);
 
   // Connect Handle edges
   const onConnect = useCallback(
@@ -789,16 +805,43 @@ function BuilderCanvas() {
     [reactFlowInstance, nodes.length, setNodes]
   );
 
-  // 4. Save Protocol (PUT /api/experiments/:id)
+  // 4. Save Protocol (PUT /api/experiments/:id or POST /api/experiments)
   const handleSaveProtocol = async () => {
     setSaving(true);
     try {
-      const targetExpId = activeId || experiment?.id;
+      let targetExpId = activeId || experiment?.id;
+
       if (!targetExpId) {
-        showToast('Local protocol state cached!');
-        setSaving(false);
-        setIsDirty(false);
-        return;
+        // Create new experiment in database and redirect to /builder?id={new_id}
+        const uniqueSlug = `protocol-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
+        const created = await api.experiments.create({
+          title: experiment?.title || 'Cognitive Protocol',
+          preset: 'Visual Stroop',
+          status: 'DRAFT',
+          description: experiment?.description || 'Cognitive protocol assay.',
+          publicSlug: uniqueSlug,
+          config: {
+            displayMode: 'fullscreen',
+            backgroundColor: '#0F172A',
+            nodeGraph: { nodes, edges },
+            bidsSchema: {
+              specification: 'BIDS-EXP-SPEC-1.8.2',
+              updatedAt: new Date().toISOString(),
+              totalNodes: nodes.length,
+              totalEdges: edges.length,
+            },
+          },
+        });
+
+        const newId = created.id || created.data?.id || created.publicSlug;
+        if (newId) {
+          setExperiment(created);
+          targetExpId = newId;
+          navigate(`/builder?id=${newId}`, { replace: true });
+          setIsDirty(false);
+          showToast(`Protocol created & saved: ID ${newId.slice(0, 8)}...`);
+          return;
+        }
       }
 
       await api.experiments.update(targetExpId, {
@@ -818,8 +861,8 @@ function BuilderCanvas() {
       setIsDirty(false);
       showToast('Protocol specification saved to backend!');
     } catch (err: any) {
-      console.warn('Save failed, cached locally:', err);
-      showToast(`Protocol cached locally: ${err.message || 'Offline'}`);
+      console.warn('Save failed:', err);
+      showToast(`Protocol save error: ${err.message || 'Offline'}`);
     } finally {
       setSaving(false);
     }
@@ -871,41 +914,45 @@ function BuilderCanvas() {
     }
   };
 
-  // 404 Experiment Not Found View
+  // 404 Experiment Not Found View - Organic Card Chassis
   if (notFound) {
     return (
-      <div className="min-h-screen bg-surface flex flex-col font-sans text-on-surface">
+      <div className="min-h-screen bg-[#F0EFEB] flex flex-col font-sans text-neutral-900 pt-16">
         <Header current="builder" />
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4 border border-rose-200">
-            <span className="material-symbols-outlined text-[36px]">error_outline</span>
+          <div className="bg-white/90 backdrop-blur-md p-8 rounded-3xl border border-[#E3E0D8] shadow-[0_8px_30px_rgba(0,0,0,0.05)] max-w-md w-full flex flex-col items-center">
+            <div className="w-16 h-16 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mb-4 border border-rose-200 shadow-2xs">
+              <span className="material-symbols-outlined text-[32px]">error_outline</span>
+            </div>
+            <h2 className="text-xl font-bold font-heading text-neutral-900 mb-2">Protocol Not Found</h2>
+            <p className="text-xs text-neutral-500 mb-6 leading-relaxed">
+              The experiment identifier <code className="bg-[#FAF9F5] px-2 py-0.5 rounded-full font-mono text-teal-800 border border-neutral-200">{activeId}</code> does not exist or does not belong to your authenticated account.
+            </p>
+            <button
+              onClick={() => navigate('/experiments')}
+              className="px-5 py-2.5 bg-neutral-900 hover:bg-black text-white font-mono text-xs uppercase tracking-wider font-bold rounded-full shadow-sm hover:shadow transition-all cursor-pointer"
+            >
+              ← Return to Dashboard
+            </button>
           </div>
-          <h2 className="text-2xl font-bold font-heading text-on-surface mb-2">Protocol Not Found</h2>
-          <p className="text-sm text-on-surface-variant max-w-md mb-6 leading-relaxed">
-            The experiment identifier <code className="bg-surface-container px-2 py-0.5 rounded font-mono text-emerald-700">{activeId}</code> does not exist or does not belong to your authenticated account.
-          </p>
-          <button
-            onClick={() => navigate('/experiments')}
-            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-mono text-xs uppercase tracking-wider font-bold rounded-lg shadow-md transition-all cursor-pointer"
-          >
-            ← Return to /experiments
-          </button>
         </div>
       </div>
     );
   }
 
-  // Loading Skeleton View
+  // Loading Skeleton View - Organic Card Chassis
   if (loading) {
     return (
-      <div className="min-h-screen bg-surface flex flex-col font-sans text-on-surface">
+      <div className="min-h-screen bg-[#F0EFEB] flex flex-col font-sans text-neutral-900 pt-16">
         <Header current="builder" />
         <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
-          <span className="w-10 h-10 rounded-full border-3 border-emerald-500 border-t-transparent animate-spin mb-4"></span>
-          <h3 className="font-heading font-bold text-lg text-on-surface">Loading Protocol Specification</h3>
-          <p className="text-xs font-mono text-on-surface-variant max-w-sm mt-1">
-            Parsing React Flow nodes, timing constraints &amp; BIDS schemas...
-          </p>
+          <div className="bg-white/90 backdrop-blur-md p-8 rounded-3xl border border-[#E3E0D8] shadow-[0_8px_30px_rgba(0,0,0,0.05)] max-w-sm w-full flex flex-col items-center">
+            <span className="w-10 h-10 rounded-full border-3 border-teal-600 border-t-transparent animate-spin mb-4"></span>
+            <h3 className="font-heading font-bold text-base text-neutral-900">Loading Protocol Specification</h3>
+            <p className="text-xs font-mono text-neutral-500 mt-1.5">
+              Parsing React Flow nodes, timing constraints &amp; BIDS schemas...
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -917,11 +964,11 @@ function BuilderCanvas() {
   const expStatus = (experiment?.status || 'DRAFT').toUpperCase();
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col font-sans text-on-surface pt-16">
-      {/* Toast Notification */}
+    <div className="min-h-screen bg-[#fafafa] flex flex-col font-sans text-neutral-900 pt-16">
+      {/* Toast Notification - Organic Pebble Capsule */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-lg shadow-2xl font-mono text-xs uppercase tracking-wider flex items-center gap-3 border border-slate-700 animate-in fade-in slide-in-from-bottom-3 duration-200">
-          <span className="material-symbols-outlined text-emerald-400 text-[18px]">check_circle</span>
+        <div className="fixed bottom-6 right-6 z-50 bg-neutral-900/95 text-white px-5 py-3 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.15)] font-mono text-xs uppercase tracking-wider flex items-center gap-3 border border-neutral-700 backdrop-blur-md animate-in fade-in slide-in-from-bottom-3 duration-200">
+          <span className="material-symbols-outlined text-teal-400 text-[18px]">check_circle</span>
           <span>{toastMessage}</span>
         </div>
       )}
@@ -929,53 +976,53 @@ function BuilderCanvas() {
       {/* Dynamic Header with Live User Profile */}
       <Header current="builder" />
 
-      {/* Dynamic Breadcrumbs & Controls Banner */}
-      <section className="w-full bg-surface-container-lowest border-b border-surface-container px-4 sm:px-8 py-3 shadow-xs">
-        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+      {/* Dynamic Breadcrumbs & Controls Banner - Crisp White Card */}
+      <section className="bg-white rounded-2xl border border-slate-200 shadow-xs mx-4 sm:mx-6 my-3 p-4 sm:px-6">
+        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="flex flex-col">
-            <div className="flex items-center gap-2 text-on-surface-variant font-mono text-xs uppercase tracking-wider">
-              <Link to="/dashboard" className="hover:text-emerald-700 transition-colors">
+            <div className="flex items-center gap-2 text-neutral-500 font-mono text-xs">
+              <Link to="/dashboard" className="hover:text-teal-700 transition-colors font-medium">
                 My Experiments
               </Link>
               <span>/</span>
-              <span className="text-on-surface font-semibold">{expCode}</span>
+              <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-neutral-800 font-bold border border-slate-200 font-mono text-[10px]">{expCode}</span>
               <span>/</span>
-              <span className="text-emerald-700 font-bold">Node Graph Builder</span>
+              <span className="text-teal-700 font-bold">Node Graph Builder</span>
             </div>
-            <div className="flex items-center gap-3 mt-1">
-              <h1 className="font-heading font-bold text-lg text-on-surface">{expTitle}</h1>
-              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-mono text-[10px] uppercase font-bold">
+            <div className="flex items-center gap-3 mt-1.5">
+              <h1 className="font-heading font-bold text-xl text-neutral-900 tracking-tight">{expTitle}</h1>
+              <span className="px-2.5 py-0.5 bg-teal-50 text-teal-800 border border-teal-200 rounded-full font-mono text-[10px] uppercase font-bold tracking-wider">
                 {expVersion}-{expStatus}
               </span>
               {isDirty && (
-                <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded font-mono text-[10px] uppercase font-bold">
+                <span className="px-2.5 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-full font-mono text-[10px] uppercase font-bold tracking-wider">
                   Unsaved Changes
                 </span>
               )}
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5 font-mono text-xs">
+          <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
             <button
               onClick={() => navigate(`/run/${expCode}`)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-container hover:bg-surface-container-high text-on-surface uppercase tracking-wider rounded border border-surface-container transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-slate-50 text-neutral-800 uppercase tracking-wider font-semibold rounded-full border border-slate-200 shadow-2xs hover:shadow-xs transition-all cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[16px] text-emerald-600">play_arrow</span>
+              <span className="material-symbols-outlined text-[16px] text-teal-600">play_arrow</span>
               <span>Run Sandbox</span>
             </button>
 
             <button
               onClick={handleValidateSchema}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-container hover:bg-surface-container-high text-on-surface uppercase tracking-wider rounded border border-surface-container transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-slate-50 text-neutral-800 uppercase tracking-wider font-semibold rounded-full border border-slate-200 shadow-2xs hover:shadow-xs transition-all cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[16px] text-emerald-700">verified</span>
+              <span className="material-symbols-outlined text-[16px] text-teal-700">verified</span>
               <span>Validate Schema</span>
             </button>
 
             <button
               onClick={handleSaveProtocol}
               disabled={saving}
-              className="flex items-center gap-1.5 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white uppercase tracking-wider font-bold rounded shadow-sm transition-all cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white uppercase tracking-wider font-bold rounded-full border border-teal-700 shadow-2xs hover:shadow-xs transition-all cursor-pointer disabled:opacity-50"
             >
               <span className="material-symbols-outlined text-[16px]">
                 {saving ? 'hourglass_top' : 'save'}
@@ -996,7 +1043,7 @@ function BuilderCanvas() {
                   }
                 }
               }}
-              className="flex items-center gap-1.5 px-4 py-1.5 bg-slate-900 hover:bg-black text-white uppercase tracking-wider font-bold rounded shadow-sm transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-neutral-900 hover:bg-black text-white uppercase tracking-wider font-bold rounded-full border border-neutral-900 shadow-2xs hover:shadow-xs transition-all cursor-pointer"
             >
               <span className="material-symbols-outlined text-[16px]">rocket_launch</span>
               <span>Compile &amp; Publish</span>
@@ -1005,130 +1052,130 @@ function BuilderCanvas() {
         </div>
       </section>
 
-      {/* Main Canvas + Toolbars Area */}
-      <div className="flex-1 flex flex-col xl:flex-row overflow-hidden relative">
-        {/* Left Palette: HTML5 Drag and Drop */}
-        <aside className="w-full xl:w-72 bg-surface-container-lowest p-4 flex flex-col gap-4 shrink-0 border-r border-surface-container z-20">
+      {/* Main Canvas + Floating Sidebars Workspace */}
+      <div className="flex-1 flex flex-col xl:flex-row gap-4 px-4 sm:px-6 pb-4 sm:pb-6 overflow-hidden relative">
+        {/* Left Palette: HTML5 Drag and Drop Floating Card */}
+        <aside className="w-full xl:w-72 bg-white rounded-2xl p-5 flex flex-col gap-4 shrink-0 border border-slate-200 shadow-xs z-20">
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <span className="font-mono text-xs text-on-surface uppercase tracking-wider font-bold">Node Palette</span>
-              <span className="px-1.5 py-0.5 bg-surface-container font-mono text-[10px] text-on-surface-variant rounded">DRAG TO ADD</span>
+              <span className="font-mono text-xs text-neutral-900 uppercase tracking-wider font-bold">Node Palette</span>
+              <span className="px-2.5 py-0.5 bg-slate-100 border border-slate-200 font-mono text-[10px] text-neutral-600 rounded-full font-bold tracking-wider uppercase">DRAG TO ADD</span>
             </div>
-            <p className="text-[11px] text-on-surface-variant leading-snug mb-2">
-              Drag node templates onto the React Flow canvas to generate new trial elements.
+            <p className="text-[11px] text-neutral-500 leading-snug">
+              Drag node templates onto the canvas to construct your experimental workflow.
             </p>
           </div>
 
-          <div className="flex flex-col gap-2 overflow-y-auto max-h-[380px] xl:max-h-[520px] pr-1">
+          <div className="flex flex-col gap-2.5 overflow-y-auto max-h-[380px] xl:max-h-[520px] pr-1">
             {/* Instruction Node */}
             <div
               draggable
               onDragStart={(e) => onDragStartFromPalette(e, 'instruction')}
-              className="p-3 bg-surface-container-low hover:bg-surface-container rounded-xl border border-surface-container transition-all cursor-grab active:cursor-grabbing group hover:border-emerald-300 select-none"
+              className="p-3.5 bg-slate-50/70 hover:bg-white rounded-xl border border-slate-200 hover:border-teal-500 hover:shadow-xs transition-all cursor-grab active:cursor-grabbing group select-none"
             >
               <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-1.5 font-semibold text-xs text-on-surface">
-                  <span className="material-symbols-outlined text-[16px] text-emerald-700">assignment</span>
+                <div className="flex items-center gap-1.5 font-semibold text-xs text-neutral-900">
+                  <span className="material-symbols-outlined text-[16px] text-teal-700">assignment</span>
                   <span>Instruction</span>
                 </div>
-                <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-mono rounded uppercase">Consent</span>
+                <span className="px-2.5 py-0.5 bg-teal-50 text-teal-800 border border-teal-200 text-[10px] font-mono rounded-full uppercase font-bold tracking-wider">Consent</span>
               </div>
-              <p className="text-[11px] text-on-surface-variant leading-snug">Participant briefing, consent, and task rules.</p>
+              <p className="text-[11px] text-neutral-500 leading-snug">Participant briefing, consent, and task rules.</p>
             </div>
 
             {/* Stimulus Node */}
             <div
               draggable
               onDragStart={(e) => onDragStartFromPalette(e, 'stimulus')}
-              className="p-3 bg-surface-container-low hover:bg-surface-container rounded-xl border border-surface-container transition-all cursor-grab active:cursor-grabbing group hover:border-emerald-300 select-none"
+              className="p-3.5 bg-slate-50/70 hover:bg-white rounded-xl border border-slate-200 hover:border-teal-500 hover:shadow-xs transition-all cursor-grab active:cursor-grabbing group select-none"
             >
               <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-1.5 font-semibold text-xs text-on-surface">
-                  <span className="material-symbols-outlined text-[16px] text-emerald-700">visibility</span>
+                <div className="flex items-center gap-1.5 font-semibold text-xs text-neutral-900">
+                  <span className="material-symbols-outlined text-[16px] text-teal-700">visibility</span>
                   <span>Stimulus</span>
                 </div>
-                <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-mono rounded uppercase">Visual/Text</span>
+                <span className="px-2.5 py-0.5 bg-teal-50 text-teal-800 border border-teal-200 text-[10px] font-mono rounded-full uppercase font-bold tracking-wider">Visual/Text</span>
               </div>
-              <p className="text-[11px] text-on-surface-variant leading-snug">Fixation cross, SVG targets, and ISI duration.</p>
+              <p className="text-[11px] text-neutral-500 leading-snug">Fixation cross, SVG targets, and ISI duration.</p>
             </div>
 
             {/* Response Node */}
             <div
               draggable
               onDragStart={(e) => onDragStartFromPalette(e, 'response')}
-              className="p-3 bg-surface-container-low hover:bg-surface-container rounded-xl border border-surface-container transition-all cursor-grab active:cursor-grabbing group hover:border-emerald-300 select-none"
+              className="p-3.5 bg-slate-50/70 hover:bg-white rounded-xl border border-slate-200 hover:border-teal-500 hover:shadow-xs transition-all cursor-grab active:cursor-grabbing group select-none"
             >
               <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-1.5 font-semibold text-xs text-on-surface">
-                  <span className="material-symbols-outlined text-[16px] text-emerald-700">keyboard</span>
+                <div className="flex items-center gap-1.5 font-semibold text-xs text-neutral-900">
+                  <span className="material-symbols-outlined text-[16px] text-teal-700">keyboard</span>
                   <span>Response</span>
                 </div>
-                <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-mono rounded uppercase">Key/RT</span>
+                <span className="px-2.5 py-0.5 bg-teal-50 text-teal-800 border border-teal-200 text-[10px] font-mono rounded-full uppercase font-bold tracking-wider">Key/RT</span>
               </div>
-              <p className="text-[11px] text-on-surface-variant leading-snug">Keypress capture and millisecond precision.</p>
+              <p className="text-[11px] text-neutral-500 leading-snug">Keypress capture and millisecond precision.</p>
             </div>
 
             {/* Branch Node */}
             <div
               draggable
               onDragStart={(e) => onDragStartFromPalette(e, 'branch')}
-              className="p-3 bg-surface-container-low hover:bg-surface-container rounded-xl border border-surface-container transition-all cursor-grab active:cursor-grabbing group hover:border-emerald-300 select-none"
+              className="p-3.5 bg-slate-50/70 hover:bg-white rounded-xl border border-slate-200 hover:border-teal-500 hover:shadow-xs transition-all cursor-grab active:cursor-grabbing group select-none"
             >
               <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-1.5 font-semibold text-xs text-on-surface">
-                  <span className="material-symbols-outlined text-[16px] text-emerald-700">alt_route</span>
+                <div className="flex items-center gap-1.5 font-semibold text-xs text-neutral-900">
+                  <span className="material-symbols-outlined text-[16px] text-teal-700">alt_route</span>
                   <span>Branch Route</span>
                 </div>
-                <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-mono rounded uppercase">Condition</span>
+                <span className="px-2.5 py-0.5 bg-teal-50 text-teal-800 border border-teal-200 text-[10px] font-mono rounded-full uppercase font-bold tracking-wider">Condition</span>
               </div>
-              <p className="text-[11px] text-on-surface-variant leading-snug">Conditional routing based on correctness.</p>
+              <p className="text-[11px] text-neutral-500 leading-snug">Conditional routing based on correctness.</p>
             </div>
 
             {/* Block Iterator Node */}
             <div
               draggable
               onDragStart={(e) => onDragStartFromPalette(e, 'iterator')}
-              className="p-3 bg-surface-container-low hover:bg-surface-container rounded-xl border border-surface-container transition-all cursor-grab active:cursor-grabbing group hover:border-emerald-300 select-none"
+              className="p-3.5 bg-slate-50/70 hover:bg-white rounded-xl border border-slate-200 hover:border-teal-500 hover:shadow-xs transition-all cursor-grab active:cursor-grabbing group select-none"
             >
               <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-1.5 font-semibold text-xs text-on-surface">
-                  <span className="material-symbols-outlined text-[16px] text-emerald-700">sync</span>
+                <div className="flex items-center gap-1.5 font-semibold text-xs text-neutral-900">
+                  <span className="material-symbols-outlined text-[16px] text-teal-700">sync</span>
                   <span>Block Iterator</span>
                 </div>
-                <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-mono rounded uppercase">Loop</span>
+                <span className="px-2.5 py-0.5 bg-teal-50 text-teal-800 border border-teal-200 text-[10px] font-mono rounded-full uppercase font-bold tracking-wider">Loop</span>
               </div>
-              <p className="text-[11px] text-on-surface-variant leading-snug">Trial looping and Latin square balancing.</p>
+              <p className="text-[11px] text-neutral-500 leading-snug">Trial looping and Latin square balancing.</p>
             </div>
           </div>
 
-          {/* Graph Diagnostics Panel */}
-          <div className="mt-auto p-3 bg-surface-container rounded-xl border border-surface-container font-mono text-xs">
-            <div className="flex items-center justify-between mb-1 uppercase font-bold text-on-surface">
+          {/* Graph Diagnostics Panel - Soft Organic Box */}
+          <div className="mt-auto p-4 bg-slate-50 rounded-xl border border-slate-200 font-mono text-xs">
+            <div className="flex items-center justify-between mb-1.5 uppercase font-bold text-neutral-900">
               <span>Graph Diagnostics</span>
               {validationIssues.length === 0 ? (
-                <span className="text-emerald-700 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> 0 ERRORS
+                <span className="text-teal-700 bg-teal-50 border border-teal-200 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal-500"></span> 0 ERRORS
                 </span>
               ) : (
-                <span className="text-amber-700 flex items-center gap-1">
+                <span className="text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span> {validationIssues.length} ISSUES
                 </span>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-1 text-[11px] text-on-surface-variant">
-              <div>Nodes: <strong className="text-on-surface">{nodes.length}</strong></div>
-              <div>Edges: <strong className="text-on-surface">{edges.length}</strong></div>
-              <div className="col-span-2">Schema: <strong className="text-on-surface">BIDS-EXP-SPEC-1.8.2</strong></div>
+            <div className="grid grid-cols-2 gap-1.5 text-[11px] text-neutral-600">
+              <div>Nodes: <strong className="text-neutral-900">{nodes.length}</strong></div>
+              <div>Edges: <strong className="text-neutral-900">{edges.length}</strong></div>
+              <div className="col-span-2">Schema: <strong className="text-neutral-900">BIDS-EXP-SPEC-1.8.2</strong></div>
               {validationTimestamp && (
-                <div className="col-span-2 text-[10px] text-slate-500 mt-1">
+                <div className="col-span-2 text-[10px] text-neutral-400 mt-1">
                   Validated at {validationTimestamp}
                 </div>
               )}
             </div>
             {validationIssues.length > 0 && (
-              <div className="mt-2 pt-2 border-t border-surface-container-highest max-h-24 overflow-y-auto space-y-1">
+              <div className="mt-2.5 pt-2 border-t border-slate-200 max-h-24 overflow-y-auto space-y-1">
                 {validationIssues.map((issue, idx) => (
-                  <div key={idx} className="text-[10px] text-amber-700 leading-tight flex items-start gap-1">
+                  <div key={idx} className="text-[10px] text-amber-800 leading-tight flex items-start gap-1">
                     <span>⚠</span>
                     <span>{issue}</span>
                   </div>
@@ -1138,9 +1185,9 @@ function BuilderCanvas() {
           </div>
         </aside>
 
-        {/* Center: Interactive React Flow Workspace */}
+        {/* Center: Interactive React Flow Workspace Floating Canvas */}
         <main
-          className="flex-1 h-[720px] xl:h-auto min-h-[640px] relative bg-slate-50"
+          className="flex-1 h-[720px] xl:h-auto min-h-[640px] relative bg-[#fafafa] rounded-2xl border border-slate-200 shadow-xs overflow-hidden"
           onDragOver={onDragOverCanvas}
           onDrop={onDropOnCanvas}
         >
@@ -1157,260 +1204,47 @@ function BuilderCanvas() {
             fitViewOptions={{ padding: 0.2 }}
             defaultEdgeOptions={{
               animated: true,
-              style: { stroke: '#10b981', strokeWidth: 2 },
+              style: { stroke: '#0D9488', strokeWidth: 2 },
             }}
           >
-            <Background variant={BackgroundVariant.Dots} gap={24} size={1.5} color="#94a3b8" />
-            <Controls className="!bg-white !border !border-slate-200 !shadow-sm !rounded-lg" />
+            <Background variant={BackgroundVariant.Dots} gap={24} size={1.5} color="#CBD5E1" />
+            <Controls className="!bg-white !border !border-slate-200 !shadow-xs !rounded-xl !p-1" />
             <MiniMap
               nodeColor={(n) => {
-                if (n.type === 'instruction') return '#10b981';
-                if (n.type === 'stimulus') return '#0284c7';
-                if (n.type === 'response') return '#6366f1';
-                if (n.type === 'branch') return '#f59e0b';
-                return '#64748b';
+                if (n.type === 'instruction') return '#0D9488';
+                if (n.type === 'stimulus') return '#0284C7';
+                if (n.type === 'response') return '#6366F1';
+                if (n.type === 'branch') return '#F59E0B';
+                return '#64748B';
               }}
-              className="!bg-white/90 !border !border-slate-200 !rounded-lg !shadow-sm"
-              maskColor="rgba(241, 245, 249, 0.7)"
+              className="!bg-white !border !border-slate-200 !rounded-xl !shadow-xs"
+              maskColor="rgba(248, 250, 252, 0.7)"
             />
           </ReactFlow>
         </main>
 
-        {/* Right Inspector: Synchronized Live with Selected Node */}
-        <aside className="w-full xl:w-96 bg-surface-container-lowest p-4 flex flex-col gap-4 shrink-0 border-l border-surface-container z-20 overflow-y-auto">
-          <div className="flex items-center justify-between pb-2 border-b border-surface-container">
-            <div>
-              <span className="font-mono text-[10px] text-on-surface-variant uppercase tracking-wider block">
-                SELECTED NODE INSPECTOR
-              </span>
-              <h2 className="font-heading font-bold text-sm text-on-surface">
-                {selectedNode ? selectedNode.data.label : 'NO NODE SELECTED'}
-              </h2>
-            </div>
-            {selectedNode && (
-              <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded font-mono text-[10px] uppercase font-bold flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                {selectedNode.type?.toUpperCase()}
-              </span>
-            )}
-          </div>
-
-          {selectedNode ? (
-            <>
-              {/* Tab Navigation */}
-              <div className="flex bg-surface-container p-0.5 rounded-lg font-mono text-xs">
-                <button
-                  type="button"
-                  onClick={() => setSelectedTab('visual')}
-                  className={`flex-1 py-1.5 text-center rounded transition-all cursor-pointer ${
-                    selectedTab === 'visual'
-                      ? 'bg-surface-container-lowest text-on-surface font-bold shadow-xs'
-                      : 'text-on-surface-variant hover:text-on-surface'
-                  }`}
-                >
-                  Visual
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedTab('bids')}
-                  className={`flex-1 py-1.5 text-center rounded transition-all cursor-pointer ${
-                    selectedTab === 'bids'
-                      ? 'bg-surface-container-lowest text-on-surface font-bold shadow-xs'
-                      : 'text-on-surface-variant hover:text-on-surface'
-                  }`}
-                >
-                  BIDS Schema
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedTab('timing')}
-                  className={`flex-1 py-1.5 text-center rounded transition-all cursor-pointer ${
-                    selectedTab === 'timing'
-                      ? 'bg-surface-container-lowest text-on-surface font-bold shadow-xs'
-                      : 'text-on-surface-variant hover:text-on-surface'
-                  }`}
-                >
-                  Timing
-                </button>
-              </div>
-
-              {/* Inspector Content */}
-              <div className="flex flex-col gap-3 text-xs">
-                <div>
-                  <label className="font-mono text-[11px] text-on-surface-variant uppercase font-medium block mb-1">
-                    Node Title / Descriptor
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedNode.data.title || ''}
-                    onChange={(e) => updateSelectedNodeData({ title: e.target.value })}
-                    className="w-full bg-surface-container-low text-on-surface font-mono font-bold px-3 py-2 rounded-lg border border-surface-container focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  />
-                </div>
-
-                {/* Stimulus Text Literal */}
-                {(selectedNode.type === 'stimulus' || selectedNode.type === 'instruction') && (
-                  <div>
-                    <label className="font-mono text-[11px] text-on-surface-variant uppercase font-medium block mb-1">
-                      Stimulus Text Literal
-                    </label>
-                    <input
-                      type="text"
-                      value={selectedNode.data.text || ''}
-                      onChange={(e) => updateSelectedNodeData({ text: e.target.value })}
-                      className="w-full bg-surface-container-low text-on-surface font-mono font-bold px-3 py-2 rounded-lg border border-surface-container focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                    />
-                  </div>
-                )}
-
-                {/* Ink Color Picker & Congruency */}
-                {selectedNode.type === 'stimulus' && (
-                  <div className="grid grid-cols-2 gap-2 font-mono">
-                    <div>
-                      <label className="text-[11px] text-on-surface-variant uppercase block mb-1">Ink Color</label>
-                      <div className="flex items-center gap-2 bg-surface-container-low px-2 py-1 rounded-lg border border-surface-container">
-                        <input
-                          type="color"
-                          value={selectedNode.data.ink || '#10b981'}
-                          onChange={(e) => updateSelectedNodeData({ ink: e.target.value })}
-                          className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent"
-                        />
-                        <span className="text-on-surface font-bold text-xs">{selectedNode.data.ink || '#10b981'}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-[11px] text-on-surface-variant uppercase block mb-1">Congruency</label>
-                      <select
-                        value={selectedNode.data.congruency || 'congruent'}
-                        onChange={(e) => updateSelectedNodeData({ congruency: e.target.value as any })}
-                        className="w-full bg-surface-container-low px-2 py-1.5 rounded-lg border border-surface-container text-on-surface font-bold text-xs focus:outline-none"
-                      >
-                        <option value="congruent">Congruent</option>
-                        <option value="incongruent">Incongruent</option>
-                        <option value="neutral">Neutral</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
-
-                {/* Dwell and ISI */}
-                <div className="grid grid-cols-2 gap-2 font-mono">
-                  <div>
-                    <label className="text-[11px] text-on-surface-variant uppercase block mb-1">Dwell (ms)</label>
-                    <input
-                      type="number"
-                      value={selectedNode.data.dwell ?? 1000}
-                      onChange={(e) => updateSelectedNodeData({ dwell: parseInt(e.target.value) || 0 })}
-                      className="w-full bg-surface-container-low text-on-surface px-3 py-1.5 rounded-lg border border-surface-container focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] text-on-surface-variant uppercase block mb-1">ISI (ms)</label>
-                    <input
-                      type="number"
-                      value={selectedNode.data.isi ?? 350}
-                      onChange={(e) => updateSelectedNodeData({ isi: parseInt(e.target.value) || 0 })}
-                      className="w-full bg-surface-container-low text-on-surface px-3 py-1.5 rounded-lg border border-surface-container focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                {/* Allowed Keys for Response Node */}
-                {selectedNode.type === 'response' && (
-                  <div>
-                    <label className="font-mono text-[11px] text-on-surface-variant uppercase font-medium block mb-1">
-                      Allowed Keybinds (comma separated)
-                    </label>
-                    <input
-                      type="text"
-                      value={(selectedNode.data.allowedKeys || []).join(', ')}
-                      onChange={(e) =>
-                        updateSelectedNodeData({
-                          allowedKeys: e.target.value.split(',').map((k) => k.trim().toUpperCase()).filter(Boolean),
-                        })
-                      }
-                      className="w-full bg-surface-container-low text-on-surface font-mono font-bold px-3 py-2 rounded-lg border border-surface-container focus:outline-none"
-                    />
-                  </div>
-                )}
-
-                {/* Live Synchronized Declarative BIDS Mapping Output */}
-                <div className="mt-2">
-                  <div className="flex items-center justify-between pb-1 font-mono text-[11px] text-on-surface uppercase font-bold">
-                    <span>Declarative BIDS Mapping</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard?.writeText(
-                          JSON.stringify(
-                            {
-                              node_id: selectedNode.id,
-                              type: `bids.${selectedNode.type}`,
-                              parameters: {
-                                title: selectedNode.data.title,
-                                text: selectedNode.data.text,
-                                ink_color: selectedNode.data.ink,
-                                dwell_ms: selectedNode.data.dwell,
-                                isi_ms: selectedNode.data.isi,
-                                congruency: selectedNode.data.congruency,
-                                allowed_keys: selectedNode.data.allowedKeys,
-                              },
-                              bids_schema: selectedNode.data.bids || {},
-                            },
-                            null,
-                            2
-                          )
-                        );
-                        showToast('BIDS JSON specification copied');
-                      }}
-                      className="text-emerald-700 hover:underline flex items-center gap-0.5 text-[10px] cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[12px]">content_copy</span> Copy
-                    </button>
-                  </div>
-                  <div className="bg-slate-950 text-emerald-400 p-3 rounded-xl font-mono text-[11px] leading-relaxed border border-slate-800 max-h-56 overflow-y-auto">
-                    <pre>
-                      {JSON.stringify(
-                        {
-                          node_id: selectedNode.id,
-                          type: `bids.${selectedNode.type}`,
-                          parameters: {
-                            title: selectedNode.data.title,
-                            text: selectedNode.data.text || undefined,
-                            ink_color: selectedNode.data.ink || undefined,
-                            dwell_ms: selectedNode.data.dwell ?? undefined,
-                            isi_ms: selectedNode.data.isi ?? undefined,
-                            congruency: selectedNode.data.congruency || undefined,
-                            allowed_keys: selectedNode.data.allowedKeys || undefined,
-                            bids_schema: selectedNode.data.bids || {},
-                          },
-                        },
-                        null,
-                        2
-                      )}
-                    </pre>
-                  </div>
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="text-center py-8 text-on-surface-variant font-mono text-xs">
-              Click a node on the React Flow canvas to inspect and edit its parameters.
-            </div>
-          )}
-        </aside>
+        {/* Right Inspector: Synchronized Live with Selected Node Floating Card */}
+        <SelectedNodeInspector
+          selectedNode={selectedNode}
+          selectedTab={selectedTab}
+          setSelectedTab={setSelectedTab}
+          updateSelectedNodeData={updateSelectedNodeData}
+          showToast={showToast}
+        />
       </div>
 
-      {/* Protocol Builder Footer */}
-      <footer className="w-full bg-surface-container-low border-t border-surface-container py-3 px-4 sm:px-8">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3 text-xs font-mono text-on-surface-variant">
-          <div className="flex items-center gap-3">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span className="text-on-surface uppercase font-semibold">
+      {/* Protocol Builder Footer - Clean Pebble Summary */}
+      <footer className="w-full bg-white border-t border-slate-200 py-3 px-4 sm:px-8">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3 text-xs font-mono text-neutral-500">
+          <div className="flex items-center gap-2.5">
+            <span className="w-2 h-2 rounded-full bg-teal-500"></span>
+            <span className="text-neutral-800 uppercase font-semibold">
               EXPERIMENT: {expCode} ({nodes.length} NODES)
             </span>
-            <span>|</span>
-            <span>BIDS SPEC v1.8.2 ACTIVE</span>
+            <span>•</span>
+            <span className="px-2.5 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-neutral-600 text-[10px] uppercase font-bold tracking-wider">
+              BIDS SPEC v1.8.2 ACTIVE
+            </span>
           </div>
           <div>© 2025 Manova Labs Precision Research Suite.</div>
         </div>

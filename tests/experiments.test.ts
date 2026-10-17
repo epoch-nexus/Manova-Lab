@@ -410,7 +410,7 @@ describe('Researcher Experiments API (Phase 2)', () => {
       expect(res.body.error.message).toContain('at least one trial');
     });
 
-    it('should reject publish when trial references a nonexistent nextTrialId', async () => {
+        it('should reject publish when trial references a nonexistent nextTrialId', async () => {
       const brokenPointerExp = await request(app)
         .post('/api/v1/experiments')
         .set(authHeader)
@@ -420,7 +420,10 @@ describe('Researcher Experiments API (Phase 2)', () => {
           publicSlug: 'broken-pointer-study',
         });
 
-      // Bypass create validation directly in DB to simulate invalid legacy/draft state
+      // Bypass create validation directly in DB to simulate invalid legacy/draft state.
+      // Trial 1 points at a trial that does not exist. Trial 2 is a valid terminal trial so
+      // the "at least one terminal trial" check passes and the dangling-pointer check is the
+      // first issue reported.
       await prisma.trial.create({
         data: {
           id: '99999999-9999-4999-8999-999999999999',
@@ -433,16 +436,43 @@ describe('Researcher Experiments API (Phase 2)', () => {
             waitForResponse: false,
           },
           nextTrialId: '00000000-9999-9999-9999-000000000000', // Does not exist
-          // branching with both arms null makes this trial terminal-via-branching,
-          // so the "at least one terminal trial" check passes and the
-          // "nextTrialId does not exist" error surfaces as the first error.
-          branching: { ifCorrect: null, ifIncorrect: null },
           experimentId: brokenPointerExp.body.id,
           stimulus: {
             create: {
               id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
               type: 'text',
               content: 'Stimulus',
+            },
+          },
+          expectedResponse: {
+            create: {
+              type: 'keypress',
+              allowedKeys: ['Space'],
+              correctResponse: 'Space',
+              evaluationMode: 'exact_match',
+            },
+          },
+        },
+      });
+
+      await prisma.trial.create({
+        data: {
+          id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+          orderIndex: 2,
+          timingConfig: {
+            preStimulusDelayMs: 500,
+            stimulusDurationMs: 1000,
+            responseTimeoutMs: 2000,
+            allowEarlyResponse: false,
+            waitForResponse: false,
+          },
+          nextTrialId: null, // Terminal trial
+          experimentId: brokenPointerExp.body.id,
+          stimulus: {
+            create: {
+              id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+              type: 'text',
+              content: 'Terminal Stimulus',
             },
           },
           expectedResponse: {
@@ -474,7 +504,8 @@ describe('Researcher Experiments API (Phase 2)', () => {
           publicSlug: 'looping-study',
         });
 
-      // Insert trial pointing to itself without terminal trial
+      // Insert trial pointing to itself without terminal trial.
+      // correctResponse is required for exact_match, otherwise trial validation fails first.
       await prisma.trial.create({
         data: {
           id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
@@ -512,6 +543,165 @@ describe('Researcher Experiments API (Phase 2)', () => {
       expect(res.status).toBe(422);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
       expect(res.body.error.message).toContain('at least one terminal trial');
+    });
+  });
+
+  describe('Protocol Route Parameter Handling, Persistence & Dynamic BIDS Parsing', () => {
+    it('should create an experiment via POST /api/experiments with nodeGraph, generate a unique ID, and persist nodeGraph', async () => {
+      const customNodeGraph = {
+        nodes: [
+          {
+            id: 'node-custom-1',
+            type: 'stimulus',
+            position: { x: 100, y: 100 },
+            data: {
+              label: 'STIMULUS_X',
+              text: 'GO_TARGET',
+              dwell: 800,
+              bids: {
+                trial_type: 'go_signal',
+                task_name: 'gonogo_assay',
+              },
+            },
+          },
+        ],
+        edges: [],
+      };
+
+      const res = await request(app)
+        .post('/api/experiments')
+        .set(authHeader)
+        .send({
+          title: 'Custom Go No-Go Experiment',
+          description: 'Inhibition control study.',
+          publicSlug: 'custom-gonogo-assay',
+          preset: 'Go / No-Go',
+          config: {
+            displayMode: 'fullscreen',
+            backgroundColor: '#0F172A',
+            nodeGraph: customNodeGraph,
+          },
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.id).toBeDefined();
+      expect(typeof res.body.id).toBe('string');
+      expect(res.body.preset).toBe('Go / No-Go');
+      expect(res.body.config).toBeDefined();
+      expect(res.body.config.nodeGraph).toEqual(customNodeGraph);
+
+      // Verify retrieval via GET /api/experiments/:experiment_id path parameter
+      const fetchRes = await request(app)
+        .get(`/api/experiments/${res.body.id}`)
+        .set(authHeader);
+
+      expect(fetchRes.status).toBe(200);
+      expect(fetchRes.body.id).toBe(res.body.id);
+      expect(fetchRes.body.title).toBe('Custom Go No-Go Experiment');
+      expect(fetchRes.body.config.nodeGraph).toEqual(customNodeGraph);
+      expect(fetchRes.body.config.nodeGraph.nodes[0].data.text).toBe('GO_TARGET');
+    });
+
+    it('should return 404 Not Found for nonexistent experiment ID instead of fallback Stroop', async () => {
+      const nonexistentId = '99999999-9999-4999-8999-999999999999';
+      const res = await request(app)
+        .get(`/api/experiments/${nonexistentId}`)
+        .set(authHeader);
+
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBeDefined();
+      expect(res.body.error.code).toBe('EXPERIMENT_NOT_FOUND');
+      // Must not return a fallback experiment object with Stroop schema
+      expect(res.body.title).toBeUndefined();
+      expect(res.body.trials).toBeUndefined();
+    });
+
+    it('should dynamically deserialize nodes and edges with dynamic BIDS parameters from trials without hardcoding to color-naming Stroop', async () => {
+      const trialRes = await request(app)
+        .post('/api/v1/experiments')
+        .set(authHeader)
+        .send({
+          title: 'Auditory Tone Discrimination Study',
+          description: 'Discriminate high vs low frequency audio stimuli.',
+          publicSlug: 'audio-freq-study',
+          trials: [
+            {
+              id: '44444444-4444-4444-8444-444444444444',
+              orderIndex: 1,
+              label: 'Step 1 - Tone Burst',
+              instructions: 'Press Space when tone completes',
+              timingConfig: {
+                preStimulusDelayMs: 400,
+                stimulusDurationMs: 1200,
+                responseTimeoutMs: 2000,
+                allowEarlyResponse: false,
+                waitForResponse: true,
+              },
+              stimulus: {
+                id: '55555555-5555-4555-8555-555555555555',
+                type: 'text',
+                content: '1000Hz_TONE',
+                styling: { color: '#38bdf8' },
+              },
+              expectedResponse: {
+                type: 'keypress',
+                allowedKeys: ['Space'],
+                correctResponse: 'Space',
+                evaluationMode: 'exact_match',
+              },
+              nextTrialId: null,
+            },
+          ],
+        });
+
+      expect(trialRes.status).toBe(201);
+      const newExpId = trialRes.body.id;
+
+      // Fetch by ID via GET /api/experiments/:experiment_id
+      const getRes = await request(app)
+        .get(`/api/experiments/${newExpId}`)
+        .set(authHeader);
+
+      expect(getRes.status).toBe(200);
+      expect(getRes.body.config).toBeDefined();
+      expect(getRes.body.config.nodeGraph).toBeDefined();
+
+      const deserializedNodes = getRes.body.config.nodeGraph.nodes;
+      expect(deserializedNodes.length).toBeGreaterThan(0);
+
+      const toneNode = deserializedNodes[0];
+      expect(toneNode.data.text).toBe('1000Hz_TONE');
+      expect(toneNode.data.bids.stimulus.text).toBe('1000Hz_TONE');
+      expect(toneNode.data.bids.allowed_keys).toEqual(['Space']);
+      expect(toneNode.data.bids.correct_response).toBe('Space');
+
+      // Crucial assertion: BIDS stimulus must NOT be hardcoded to Stroop color-naming template
+      expect(toneNode.data.bids.word).toBeUndefined();
+      expect(toneNode.data.bids.color).toBeUndefined();
+      expect(toneNode.data.bids.task_name).not.toBe('stroop_interference');
+    });
+
+    it('should support /api/protocols route aliases for creating and fetching protocols', async () => {
+      const protoRes = await request(app)
+        .post('/api/protocols')
+        .set(authHeader)
+        .send({
+          title: 'Working Memory Spatial Grid Protocol',
+          description: 'Assess visuospatial working memory load.',
+          publicSlug: 'spatial-grid-wm',
+          preset: 'N-Back',
+        });
+
+      expect(protoRes.status).toBe(201);
+      const protoId = protoRes.body.id;
+
+      const getProto = await request(app)
+        .get(`/api/protocols/${protoId}`)
+        .set(authHeader);
+
+      expect(getProto.status).toBe(200);
+      expect(getProto.body.id).toBe(protoId);
+      expect(getProto.body.title).toBe('Working Memory Spatial Grid Protocol');
     });
   });
 });

@@ -48,15 +48,16 @@ experimentRouter.get(
 );
 
 /**
- * GET /experiments/:id
- * Retrieve single experiment by ID
+ * GET /experiments/:id or /experiments/:experiment_id
+ * Retrieve single experiment by ID or publicSlug
  */
 experimentRouter.get(
-  '/:id',
+  ['/:id', '/:experiment_id'],
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      const expId = (req.params.id || req.params.experiment_id || req.params.experimentId) as string;
       const researcherId = req.researcher!.id;
-      const result = await experimentService.getExperimentById(req.params.id as string, researcherId);
+      const result = await experimentService.getExperimentById(expId, researcherId);
       res.status(200).json(result);
     } catch (err) {
       next(err);
@@ -65,16 +66,17 @@ experimentRouter.get(
 );
 
 /**
- * PUT /experiments/:id
+ * PUT /experiments/:id or /experiments/:experiment_id
  * Update an existing experiment
  */
 experimentRouter.put(
-  '/:id',
+  ['/:id', '/:experiment_id'],
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      const expId = (req.params.id || req.params.experiment_id || req.params.experimentId) as string;
       const researcherId = req.researcher!.id;
       const result = await experimentService.updateExperiment(
-        req.params.id as string,
+        expId,
         req.body,
         researcherId
       );
@@ -86,16 +88,17 @@ experimentRouter.put(
 );
 
 /**
- * DELETE /experiments/:id
+ * DELETE /experiments/:id or /experiments/:experiment_id
  * Delete an experiment
  */
 experimentRouter.delete(
-  '/:id',
+  ['/:id', '/:experiment_id'],
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      const expId = (req.params.id || req.params.experiment_id || req.params.experimentId) as string;
       const researcherId = req.researcher!.id;
       const force = req.query.force === 'true';
-      await experimentService.deleteExperiment(req.params.id as string, researcherId, force);
+      await experimentService.deleteExperiment(expId, researcherId, force);
       res.status(204).send();
     } catch (err) {
       next(err);
@@ -104,15 +107,16 @@ experimentRouter.delete(
 );
 
 /**
- * POST /experiments/:id/publish
+ * POST /experiments/:id/publish or /experiments/:experiment_id/publish
  * Publish and freeze an experiment snapshot
  */
 experimentRouter.post(
-  '/:id/publish',
+  ['/:id/publish', '/:experiment_id/publish'],
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      const expId = (req.params.id || req.params.experiment_id || req.params.experimentId) as string;
       const researcherId = req.researcher!.id;
-      const result = await experimentService.publishExperiment(req.params.id as string, researcherId);
+      const result = await experimentService.publishExperiment(expId, researcherId);
       res.status(200).json(result);
     } catch (err) {
       next(err);

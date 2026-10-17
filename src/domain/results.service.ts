@@ -93,7 +93,7 @@ function escapeCsvValue(val: unknown): string {
   return safe;
 }
 
-// CSV header row (sessionStatus is the last column — Fix 5)
+// CSV header row
 const CSV_HEADERS = [
   'sessionId',
   'experimentId',
@@ -109,7 +109,6 @@ const CSV_HEADERS = [
   'displayRefreshRateEstimateHz',
   'hiddenTabDetected',
   'submittedAt',
-  'sessionStatus',
 ];
 
 function formatRecord(row: {
@@ -160,7 +159,6 @@ function recordToCsvRow(r: FormattedResultRecord): string {
     escapeCsvValue(hp['displayRefreshRateEstimateHz'] ?? ''),
     escapeCsvValue(hp['hiddenTabDetected'] !== undefined ? hp['hiddenTabDetected'] : ''),
     escapeCsvValue(r.submittedAt),
-    escapeCsvValue(r.sessionStatus),
   ].join(',');
 }
 
@@ -467,6 +465,117 @@ export class ResultsService {
     } while (cursor !== null);
 
     return lines.join('\r\n');
+  }
+
+  /**
+   * Generates a Parquet-compatible columnar representation of trial results.
+   */
+  async exportParquetCompatible(
+    experimentId: string,
+    query?: ResultsQuery,
+    researcherId?: string
+  ) {
+    const experiment = await prisma.experiment.findUnique({ where: { id: experimentId } });
+    if (!experiment) {
+      throw new NotFoundError(`Experiment '${experimentId}' not found`, 'EXPERIMENT_NOT_FOUND');
+    }
+    if (researcherId && experiment.ownerResearcherId !== researcherId) {
+      throw new ForbiddenError('You do not own this experiment');
+    }
+
+    const pageQuery: ResultsQuery = { ...query, limit: 500, includeAbandoned: query?.includeAbandoned ?? true };
+    let cursor: { afterSubmittedAt: string; afterId: string } | null = null;
+    const allResults: FormattedResultRecord[] = [];
+
+    do {
+      const page = await this.getRawResults(
+        experimentId,
+        cursor ? { ...pageQuery, afterSubmittedAt: cursor.afterSubmittedAt, afterId: cursor.afterId } : pageQuery,
+        researcherId
+      );
+      allResults.push(...page.results);
+      cursor = page.nextCursor;
+    } while (cursor !== null);
+
+    const sessionId: string[] = [];
+    const expId: string[] = [];
+    const experimentVersion: number[] = [];
+    const trialId: string[] = [];
+    const submittedResponse: (string | null)[] = [];
+    const isCorrect: (boolean | null)[] = [];
+    const reactionTimeMs: (number | null)[] = [];
+    const timedOut: boolean[] = [];
+    const stimulusOnsetTimestamp: (number | null)[] = [];
+    const responseTimestamp: (number | null)[] = [];
+    const timingMethod: (string | null)[] = [];
+    const displayRefreshRateEstimateHz: (number | null)[] = [];
+    const hiddenTabDetected: boolean[] = [];
+    const submittedAt: string[] = [];
+    const sessionStatus: string[] = [];
+
+    for (const r of allResults) {
+      const tm = (r.timingMeasurement as Record<string, unknown>) ?? {};
+      const cm = (r.clientMetadata as Record<string, unknown>) ?? {};
+
+      sessionId.push(r.sessionId);
+      expId.push(r.experimentId);
+      experimentVersion.push(r.experimentVersion);
+      trialId.push(r.trialId);
+      submittedResponse.push(r.submittedResponse);
+      isCorrect.push(r.isCorrect);
+      reactionTimeMs.push(r.reactionTimeMs);
+      timedOut.push(r.timedOut);
+      stimulusOnsetTimestamp.push(typeof tm.stimulusOnsetTimestamp === 'number' ? tm.stimulusOnsetTimestamp : null);
+      responseTimestamp.push(typeof tm.responseTimestamp === 'number' ? tm.responseTimestamp : null);
+      timingMethod.push(typeof tm.timingMethod === 'string' ? tm.timingMethod : null);
+      displayRefreshRateEstimateHz.push(typeof cm.displayRefreshRateEstimateHz === 'number' ? cm.displayRefreshRateEstimateHz : null);
+      hiddenTabDetected.push(Boolean(cm.hiddenTabDetected));
+      submittedAt.push(r.submittedAt);
+      sessionStatus.push(r.sessionStatus);
+    }
+
+    return {
+      schema: {
+        specification: 'PARQUET_COMPATIBLE_COLUMNAR_v1',
+        experimentId,
+        experimentTitle: experiment.title,
+        columns: [
+          { name: 'sessionId', type: 'UTF8' },
+          { name: 'experimentId', type: 'UTF8' },
+          { name: 'experimentVersion', type: 'INT32' },
+          { name: 'trialId', type: 'UTF8' },
+          { name: 'submittedResponse', type: 'UTF8' },
+          { name: 'isCorrect', type: 'BOOLEAN' },
+          { name: 'reactionTimeMs', type: 'FLOAT' },
+          { name: 'timedOut', type: 'BOOLEAN' },
+          { name: 'stimulusOnsetTimestamp', type: 'FLOAT' },
+          { name: 'responseTimestamp', type: 'FLOAT' },
+          { name: 'timingMethod', type: 'UTF8' },
+          { name: 'displayRefreshRateEstimateHz', type: 'FLOAT' },
+          { name: 'hiddenTabDetected', type: 'BOOLEAN' },
+          { name: 'submittedAt', type: 'TIMESTAMP_MILLIS' },
+          { name: 'sessionStatus', type: 'UTF8' },
+        ],
+      },
+      numRows: sessionId.length,
+      columns: {
+        sessionId,
+        experimentId: expId,
+        experimentVersion,
+        trialId,
+        submittedResponse,
+        isCorrect,
+        reactionTimeMs,
+        timedOut,
+        stimulusOnsetTimestamp,
+        responseTimestamp,
+        timingMethod,
+        displayRefreshRateEstimateHz,
+        hiddenTabDetected,
+        submittedAt,
+        sessionStatus,
+      },
+    };
   }
 
   /**
